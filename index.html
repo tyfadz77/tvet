@@ -1,0 +1,3444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TVET Personalized Learning Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f0f4f8;
+    --surface: #ffffff;
+    --border: #e2e8f0;
+    --text: #1a202c;
+    --muted: #718096;
+    --accent: #3b82f6;
+    --accent-dark: #2563eb;
+    --success: #10b981;
+    --warn: #f59e0b;
+    --danger: #ef4444;
+    --purple: #7c3aed;
+    --radius: 14px;
+    --shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 12px rgba(0,0,0,.06);
+  }
+
+  body {
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── APP SHELL ── */
+  #app-shell {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    padding-top: 56px; /* topbar height */
+  }
+
+  /* ── TOP NAV ── */
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 200;
+  }
+  .topbar-brand {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 700; font-size: 16px; color: var(--text);
+  }
+  .topbar-brand .logo {
+    width: 32px; height: 32px; background: var(--accent);
+    border-radius: 8px; display: flex; align-items: center;
+    justify-content: center; color: #fff; font-weight: 800; font-size: 13px;
+  }
+  .topbar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .badge-pill {
+    background: #ede9fe; color: var(--purple);
+    font-size: 11px; font-weight: 600; padding: 2px 10px; border-radius: 20px;
+  }
+  .avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: linear-gradient(135deg, #3b82f6, #7c3aed);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700; font-size: 12px;
+  }
+
+  /* ── ROLE SWITCHER ── */
+  .role-toggle { display: flex; gap: 0; border: 1.5px solid var(--accent); border-radius: 8px; overflow: hidden; }
+  .role-toggle button {
+    border: none; background: transparent; cursor: pointer;
+    font-size: 11px; font-weight: 700; padding: 4px 12px; color: var(--accent);
+    transition: background .15s, color .15s;
+  }
+  .role-toggle button.active { background: var(--accent); color: #fff; }
+
+  /* ── LANG TOGGLE ── */
+  .lang-toggle { display: flex; gap: 0; border: 1.5px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .lang-toggle button {
+    border: none; background: transparent; cursor: pointer;
+    font-size: 11px; font-weight: 700; padding: 4px 10px; color: var(--muted);
+    transition: background .15s, color .15s;
+  }
+  .lang-toggle button.active { background: var(--text); color: #fff; }
+
+  /* ── STUDENT SELECTOR BAR ── */
+  #student-bar {
+    display: none;
+    background: #f0f4f8;
+    border-bottom: 1px solid var(--border);
+    padding: 6px 20px;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    font-size: 12px;
+    position: sticky;
+    top: 56px;
+    z-index: 190;
+  }
+  #student-bar.visible { display: flex; }
+  #student-bar label { font-weight: 600; color: var(--muted); white-space: nowrap; }
+  #student-select {
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 4px 28px 4px 8px; font-size: 12px; font-weight: 600;
+    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23718096'/%3E%3C/svg%3E") no-repeat right 8px center;
+    appearance: none; cursor: pointer; max-width: 220px;
+    color: var(--text);
+  }
+  #student-select:focus { outline: none; border-color: var(--accent); }
+  .student-bar-meta { font-size: 11px; color: var(--muted); }
+  .student-bar-meta strong { color: var(--text); }
+  #import-status {
+    margin-left: auto; font-size: 11px; font-weight: 600;
+    color: var(--success); display: flex; align-items: center; gap: 5px;
+  }
+
+  /* ── IMPORT MODAL ── */
+  #import-modal .modal-box { max-width: 480px; }
+  .import-drop {
+    border: 2px dashed var(--border); border-radius: 10px;
+    padding: 28px 20px; text-align: center; cursor: pointer;
+    transition: border-color .15s, background .15s; margin: 12px 0;
+  }
+  .import-drop:hover, .import-drop.drag-over {
+    border-color: var(--accent); background: #eff6ff;
+  }
+  .import-drop .drop-icon { font-size: 32px; margin-bottom: 8px; }
+  .import-drop p { font-size: 13px; color: var(--muted); }
+  .import-drop strong { color: var(--accent); }
+  .import-preview { overflow-x: auto; margin-top: 12px; }
+  .import-preview table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .import-preview th {
+    background: #f7f8fa; font-weight: 700; text-transform: uppercase;
+    font-size: 10px; letter-spacing: .04em; padding: 5px 8px;
+    border: 1px solid var(--border); color: var(--muted);
+  }
+  .import-preview td { padding: 6px 8px; border: 1px solid var(--border); }
+  .import-preview tr:nth-child(even) td { background: #fafafa; }
+
+  /* ── LAYOUT ── */
+  .page { max-width: 1280px; margin: 0 auto; padding: 24px 20px; }
+
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .span-2 { grid-column: span 2; }
+
+  @media (max-width: 1024px) {
+    .grid-3 { grid-template-columns: 1fr 1fr; }
+    .span-2 { grid-column: span 1; }
+  }
+  @media (max-width: 680px) {
+    .grid-3, .grid-2 { grid-template-columns: 1fr; }
+    .span-2 { grid-column: span 1; }
+    .topbar-right { gap: 6px; }
+    .role-toggle button { padding: 4px 8px; font-size: 10px; }
+  }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    padding: 20px;
+  }
+  .card-title {
+    font-size: 13px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .05em; margin-bottom: 16px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .card-title .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+
+  /* ── PROFILE CARD ── */
+  .profile-header { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+  .profile-avatar {
+    width: 56px; height: 56px; border-radius: 50%;
+    background: linear-gradient(135deg, #3b82f6, #7c3aed);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 22px; font-weight: 700; flex-shrink: 0;
+  }
+  .profile-name { font-size: 17px; font-weight: 700; }
+  .profile-role { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .cert-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: #eff6ff; color: var(--accent-dark);
+    border: 1px solid #bfdbfe; border-radius: 20px;
+    font-size: 11px; font-weight: 600; padding: 3px 10px;
+  }
+  /* Badge chip variant */
+  .chip-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: #fef9c3; color: #854d0e;
+    border: 1px solid #fde68a; border-radius: 20px;
+    font-size: 11px; font-weight: 700; padding: 3px 10px;
+    animation: badge-pop .35s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes badge-pop {
+    from { transform: scale(.5); opacity: 0; }
+    to   { transform: scale(1);  opacity: 1; }
+  }
+  /* Cert readiness bars */
+  .cert-readiness { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .cert-readiness-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .cert-readiness-label { font-size: 11px; font-weight: 600; color: var(--muted); flex: 0 0 95px; }
+  .cert-readiness-bar { flex: 1; height: 7px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+  .cert-readiness-fill { height: 100%; border-radius: 4px; transition: width .6s ease; }
+  .cert-readiness-pct { font-size: 11px; font-weight: 700; flex: 0 0 32px; text-align: right; }
+  /* AI Narrative card */
+  .ai-narrative {
+    margin-top: 12px; padding: 12px 14px;
+    background: linear-gradient(135deg, #eff6ff 0%, #f5f3ff 100%);
+    border: 1px solid #c7d2fe; border-radius: 10px;
+    font-size: 12px; line-height: 1.65; color: var(--text);
+    position: relative;
+  }
+  .ai-narrative::before {
+    content: "🤖 AI Insight";
+    display: block; font-size: 10px; font-weight: 700; letter-spacing: .05em;
+    color: var(--purple); text-transform: uppercase; margin-bottom: 5px;
+  }
+  /* Sparkline in table */
+  .sparkline { display: inline-block; vertical-align: middle; margin-left: 6px; }
+  /* Weekly plan table */
+  .week-plan-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+  .week-plan-table th {
+    text-align: left; font-size: 10px; font-weight: 600;
+    color: var(--muted); text-transform: uppercase;
+    letter-spacing: .05em; padding: 5px 8px; border-bottom: 1px solid var(--border);
+  }
+  .week-plan-table td { padding: 7px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .week-plan-table tr:last-child td { border-bottom: none; }
+  /* Gemini chat typing indicator */
+  .faq-typing { display: flex; gap: 4px; align-items: center; padding: 6px 10px; }
+  .faq-typing span {
+    width: 7px; height: 7px; background: var(--muted); border-radius: 50%;
+    animation: typing-bounce .9s infinite ease-in-out;
+  }
+  .faq-typing span:nth-child(2) { animation-delay: .2s; }
+  .faq-typing span:nth-child(3) { animation-delay: .4s; }
+  @keyframes typing-bounce {
+    0%, 80%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-6px); }
+  }
+  /* Gemini API key setup */
+  #gemini-setup { padding: 10px 14px; border-top: 1px solid var(--border); background: #fafafa; }
+  #gemini-setup input {
+    width: 100%; border: 1px solid var(--border); border-radius: 6px;
+    padding: 6px 8px; font-size: 11px; margin-top: 4px; outline: none;
+  }
+  #gemini-setup input:focus { border-color: var(--purple); }
+  #gemini-setup label { font-size: 11px; font-weight: 600; color: var(--muted); }
+
+  /* ── METRIC CARDS ── */
+  .metric-value { font-size: 28px; font-weight: 800; line-height: 1.1; }
+  .metric-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .metric-bar { height: 6px; background: #e2e8f0; border-radius: 3px; margin-top: 12px; overflow: hidden; }
+  .metric-bar-fill { height: 100%; border-radius: 3px; transition: width .6s ease; }
+
+  /* ── FORM ── */
+  .form-section { margin-bottom: 0; }
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+  }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group label { font-size: 12px; font-weight: 600; color: var(--muted); }
+  .form-group input[type="range"] {
+    accent-color: var(--accent);
+    width: 100%; cursor: pointer;
+  }
+  .range-row { display: flex; align-items: center; gap: 8px; }
+  .range-val {
+    min-width: 40px; text-align: right;
+    font-weight: 700; font-size: 14px; color: var(--text);
+  }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    border: none; border-radius: 8px; cursor: pointer;
+    font-size: 13px; font-weight: 600; padding: 8px 16px; transition: opacity .15s;
+  }
+  .btn:hover { opacity: .88; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-sm { padding: 5px 12px; font-size: 12px; border-radius: 6px; }
+  .btn-outline {
+    background: #fff; color: var(--accent);
+    border: 1.5px solid var(--accent);
+  }
+  .btn-success { background: var(--success); color: #fff; }
+  .btn-warn { background: var(--warn); color: #fff; }
+  .btn-purple { background: var(--purple); color: #fff; }
+  .btn-danger { background: var(--danger); color: #fff; }
+
+  /* ── SCORES TABLE ── */
+  .scores-table { width: 100%; border-collapse: collapse; }
+  .scores-table th {
+    text-align: left; font-size: 11px; font-weight: 600;
+    color: var(--muted); text-transform: uppercase;
+    letter-spacing: .05em; padding: 6px 8px; border-bottom: 1px solid var(--border);
+  }
+  .scores-table td { padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .scores-table tr:last-child td { border-bottom: none; }
+  .score-pill {
+    display: inline-block; padding: 2px 10px; border-radius: 20px;
+    font-size: 12px; font-weight: 700;
+  }
+  .pill-success { background: #d1fae5; color: #065f46; }
+  .pill-warn    { background: #fef3c7; color: #92400e; }
+  .pill-danger  { background: #fee2e2; color: #991b1b; }
+  .mini-bar { height: 6px; background: #e2e8f0; border-radius: 3px; min-width: 60px; overflow: hidden; margin-top: 4px; }
+  .mini-bar-fill { height: 100%; border-radius: 3px; }
+
+  /* ── AI RECOMMENDATIONS ── */
+  .rec-list { display: flex; flex-direction: column; gap: 12px; }
+  .rec-item {
+    background: #fafafa; border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px;
+    border-left: 4px solid var(--warn);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .rec-item.danger { border-left-color: var(--danger); }
+  .rec-category { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
+  .rec-activity { font-size: 13px; font-weight: 600; color: var(--text); }
+  .rec-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .rec-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .learn-more {
+    font-size: 12px; font-weight: 600; color: var(--accent);
+    text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+  }
+  .learn-more:hover { text-decoration: underline; }
+  .no-rec {
+    text-align: center; padding: 28px 16px; color: var(--success);
+    font-weight: 600; font-size: 14px;
+  }
+  .no-rec span { display: block; font-size: 28px; margin-bottom: 6px; }
+
+  /* ── CHART ── */
+  .chart-wrap { position: relative; width: 100%; max-height: 320px; }
+
+  /* ── SECTION SPACER ── */
+  .section-gap { margin-top: 20px; }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+    background: #1a202c; color: #fff; padding: 12px 20px; border-radius: 10px;
+    font-size: 13px; font-weight: 500; opacity: 0;
+    transition: opacity .25s ease; pointer-events: none;
+    display: flex; align-items: center; gap: 8px;
+  }
+  #toast.show { opacity: 1; }
+
+  /* ── STATUS ICON ── */
+  .status-icon { font-size: 13px; }
+
+  /* ── MODAL OVERLAY ── */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0,0,0,.55); align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-box {
+    background: var(--surface); border-radius: var(--radius); padding: 28px 28px 24px;
+    max-width: 420px; width: calc(100% - 32px); box-shadow: 0 8px 40px rgba(0,0,0,.18);
+    position: relative;
+  }
+  .modal-box h3 { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+  .modal-box p { font-size: 12px; color: var(--muted); margin-bottom: 18px; }
+  .modal-close {
+    position: absolute; top: 14px; right: 16px; font-size: 20px; cursor: pointer;
+    color: var(--muted); background: none; border: none; line-height: 1;
+  }
+  .modal-close:hover { color: var(--text); }
+
+  /* ── QR MODAL ── */
+  #qr-container { display: flex; justify-content: center; padding: 8px 0 4px; }
+  #qr-container canvas, #qr-container img { border-radius: 8px; }
+
+  /* ── FAQ CHATBOT ── */
+  #faq-fab {
+    position: fixed; bottom: 80px; right: 24px; z-index: 998;
+    width: 52px; height: 52px; border-radius: 50%; background: var(--purple);
+    color: #fff; font-size: 22px; border: none; cursor: pointer;
+    box-shadow: 0 4px 16px rgba(124,58,237,.4); display: flex; align-items: center; justify-content: center;
+    transition: transform .2s;
+  }
+  #faq-fab:hover { transform: scale(1.08); }
+  #faq-panel {
+    display: none; position: fixed; bottom: 144px; right: 24px; z-index: 997;
+    width: 340px; max-height: 460px; background: var(--surface);
+    border-radius: var(--radius); box-shadow: 0 8px 40px rgba(0,0,0,.18);
+    border: 1px solid var(--border); flex-direction: column; overflow: hidden;
+  }
+  #faq-panel.open { display: flex; }
+  #faq-header {
+    background: var(--purple); color: #fff; padding: 12px 16px;
+    font-size: 13px; font-weight: 700; display: flex; justify-content: space-between; align-items: center;
+  }
+  #faq-header button { background: none; border: none; color: #fff; font-size: 18px; cursor: pointer; }
+  #faq-messages {
+    flex: 1; overflow-y: auto; padding: 14px 14px 8px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .faq-msg { max-width: 90%; padding: 8px 12px; border-radius: 10px; font-size: 13px; line-height: 1.5; }
+  .faq-msg.bot { background: #f0f4f8; color: var(--text); align-self: flex-start; border-bottom-left-radius: 2px; }
+  .faq-msg.user { background: var(--purple); color: #fff; align-self: flex-end; border-bottom-right-radius: 2px; }
+  #faq-input-row { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border); }
+  #faq-input {
+    flex: 1; border: 1px solid var(--border); border-radius: 8px;
+    padding: 7px 10px; font-size: 12px; outline: none;
+  }
+  #faq-input:focus { border-color: var(--purple); }
+  #faq-send {
+    background: var(--purple); color: #fff; border: none; border-radius: 8px;
+    padding: 7px 12px; font-size: 12px; cursor: pointer; font-weight: 600;
+  }
+  .faq-chip-row { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 10px; }
+  .faq-chip {
+    background: #ede9fe; color: var(--purple); border: none; border-radius: 20px;
+    font-size: 11px; font-weight: 600; padding: 3px 10px; cursor: pointer; transition: background .15s;
+  }
+  .faq-chip:hover { background: #ddd6fe; }
+
+  /* ══════════════════════════════════════
+     LEFT SIDEBAR NAV
+  ══════════════════════════════════════ */
+  :root {
+    --sidebar-w: 220px;
+    --sidebar-w-collapsed: 64px;
+    --sidebar-bg: #1a1f2e;
+    --sidebar-active: #3b82f6;
+    --sidebar-hover: rgba(255,255,255,.07);
+    --sidebar-text: rgba(255,255,255,.75);
+    --sidebar-muted: rgba(255,255,255,.38);
+    --sidebar-trans: .28s cubic-bezier(.4,0,.2,1);
+  }
+
+  #sidebar {
+    width: var(--sidebar-w);
+    min-height: 100%;
+    background: var(--sidebar-bg);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    transition: width var(--sidebar-trans);
+    position: sticky;
+    top: 56px;
+    align-self: flex-start;
+    height: calc(100vh - 56px);
+    overflow: hidden;
+    z-index: 150;
+  }
+  #sidebar.collapsed { width: var(--sidebar-w-collapsed); }
+
+  /* Sidebar header */
+  .sidebar-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 14px 10px;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+    gap: 8px;
+  }
+  .sidebar-logo-row {
+    display: flex; align-items: center; gap: 10px; overflow: hidden;
+  }
+  .sidebar-logo-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: linear-gradient(135deg,#3b82f6,#7c3aed);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 800; color: #fff; flex-shrink: 0;
+  }
+  .sidebar-logo-text {
+    font-size: 12px; font-weight: 700; color: #fff; white-space: nowrap;
+    transition: opacity var(--sidebar-trans), width var(--sidebar-trans);
+  }
+  #sidebar.collapsed .sidebar-logo-text { opacity: 0; width: 0; }
+  .sidebar-toggle {
+    background: none; border: none; cursor: pointer;
+    color: var(--sidebar-muted); font-size: 18px; line-height: 1;
+    flex-shrink: 0; padding: 2px; transition: color .15s, transform var(--sidebar-trans);
+    display: flex; align-items: center; justify-content: center;
+    width: 28px; height: 28px; border-radius: 6px;
+  }
+  .sidebar-toggle:hover { color: #fff; background: var(--sidebar-hover); }
+  #sidebar.collapsed .sidebar-toggle { transform: rotate(180deg); }
+
+  /* Section groups */
+  .sidebar-section-label {
+    font-size: 9px; font-weight: 700; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--sidebar-muted);
+    padding: 14px 16px 4px;
+    white-space: nowrap; overflow: hidden;
+    transition: opacity var(--sidebar-trans);
+  }
+  #sidebar.collapsed .sidebar-section-label { opacity: 0; }
+
+  /* Nav items */
+  .sidebar-nav { flex: 1; overflow-y: auto; overflow-x: hidden; padding-bottom: 8px; }
+  .sidebar-nav::-webkit-scrollbar { width: 3px; }
+  .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 2px; }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 9px 14px; cursor: pointer;
+    color: var(--sidebar-text); font-size: 13px; font-weight: 500;
+    border-radius: 8px; margin: 2px 8px;
+    transition: background .15s, color .15s;
+    position: relative; white-space: nowrap; overflow: hidden;
+    text-decoration: none;
+  }
+  .nav-item:hover { background: var(--sidebar-hover); color: #fff; }
+  .nav-item.active {
+    background: rgba(59,130,246,.18);
+    color: #93c5fd;
+    font-weight: 600;
+  }
+  .nav-item.active::before {
+    content: "";
+    position: absolute; left: 0; top: 20%; height: 60%;
+    width: 3px; border-radius: 0 2px 2px 0;
+    background: var(--sidebar-active);
+  }
+  .nav-icon {
+    font-size: 17px; flex-shrink: 0; width: 24px; text-align: center;
+    transition: transform .2s;
+  }
+  .nav-item:hover .nav-icon { transform: scale(1.15); }
+  .nav-label {
+    flex: 1; transition: opacity var(--sidebar-trans), width var(--sidebar-trans);
+  }
+  #sidebar.collapsed .nav-label { opacity: 0; width: 0; pointer-events: none; }
+
+  /* Badge on nav item */
+  .nav-badge {
+    font-size: 10px; font-weight: 700; padding: 1px 6px;
+    border-radius: 10px; background: var(--danger); color: #fff;
+    flex-shrink: 0; transition: opacity var(--sidebar-trans);
+    min-width: 18px; text-align: center;
+  }
+  #sidebar.collapsed .nav-badge { opacity: 0; }
+
+  /* Tooltip on collapsed */
+  #sidebar.collapsed .nav-item::after {
+    content: attr(data-tip);
+    position: absolute; left: calc(var(--sidebar-w-collapsed) - 4px);
+    background: #1a202c; color: #fff;
+    font-size: 12px; font-weight: 600; white-space: nowrap;
+    padding: 5px 10px; border-radius: 7px;
+    pointer-events: none; opacity: 0;
+    transition: opacity .15s;
+    z-index: 999; top: 50%; transform: translateY(-50%);
+    box-shadow: 0 4px 12px rgba(0,0,0,.3);
+  }
+  #sidebar.collapsed .nav-item:hover::after { opacity: 1; }
+
+  /* Sidebar footer */
+  .sidebar-footer {
+    border-top: 1px solid rgba(255,255,255,.08);
+    padding: 12px 10px;
+  }
+  .sidebar-user {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px; border-radius: 8px; cursor: pointer;
+    transition: background .15s; overflow: hidden;
+  }
+  .sidebar-user:hover { background: var(--sidebar-hover); }
+  .sidebar-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: linear-gradient(135deg,#7c3aed,#ec4899);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0;
+  }
+  .sidebar-user-info { overflow: hidden; }
+  .sidebar-user-name { font-size: 12px; font-weight: 700; color: #fff; white-space: nowrap; }
+  .sidebar-user-role { font-size: 10px; color: var(--sidebar-muted); white-space: nowrap; }
+  #sidebar.collapsed .sidebar-user-info { opacity: 0; width: 0; }
+
+  /* ── MAIN CONTENT AREA ── */
+  #main-content {
+    flex: 1;
+    min-width: 0;
+    overflow-y: auto;
+  }
+
+  /* ── PAGE / PANEL SYSTEM ── */
+  .page { max-width: 1160px; margin: 0 auto; padding: 24px 20px; }
+
+  .panel { display: none; animation: panel-in .3s cubic-bezier(.4,0,.2,1); }
+  .panel.active { display: block; }
+  @keyframes panel-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── PAGE HEADER ── */
+  .page-header {
+    display: flex; align-items: center; gap: 14px; margin-bottom: 24px;
+    padding-bottom: 20px; border-bottom: 1px solid var(--border);
+  }
+  .page-header-icon {
+    width: 44px; height: 44px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; flex-shrink: 0;
+  }
+  .page-header-title { font-size: 20px; font-weight: 800; letter-spacing: -.02em; }
+  .page-header-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* ── MOBILE SIDEBAR OVERLAY ── */
+  #sidebar-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5);
+    z-index: 140; backdrop-filter: blur(2px);
+  }
+  #sidebar-overlay.open { display: block; }
+  #mob-menu-btn {
+    display: none; background: none; border: none;
+    font-size: 22px; cursor: pointer; color: var(--text); padding: 4px 8px;
+  }
+
+  @media (max-width: 768px) {
+    #sidebar {
+      position: fixed; top: 56px; left: 0; height: calc(100vh - 56px);
+      transform: translateX(-100%); transition: transform var(--sidebar-trans), width var(--sidebar-trans);
+      width: var(--sidebar-w) !important;
+      z-index: 150;
+    }
+    #sidebar.mobile-open { transform: translateX(0); }
+    #mob-menu-btn { display: flex; }
+    #app-shell { padding-top: 56px; }
+    #sidebar-collapse-btn { display: none; }
+  }
+
+  /* ── PRINT STYLES ── */
+  @media print {
+    body { background: #fff !important; }
+    #sidebar, .topbar, #toast, #faq-fab, #faq-panel, .modal-overlay, #sidebar-overlay,
+    .btn-outline, .btn-primary, .btn-warn, .btn-danger, .no-print { display: none !important; }
+    #app-shell { padding-top: 0; }
+    .page { padding: 0 !important; max-width: 100% !important; }
+    .card { box-shadow: none !important; border: 1px solid #ddd !important; break-inside: avoid; }
+    .grid-3, .grid-2 { display: block !important; }
+    .grid-3 > *, .grid-2 > * { margin-bottom: 16px !important; }
+    #print-header { display: block !important; }
+    #print-signature { display: block !important; }
+    .section-gap { margin-top: 12px !important; }
+  }
+  #print-header { display: none; }
+  #print-signature { display: none; }
+
+  /* ══════════════════════════════════════
+     AI FUNCTIONS / GENERATOR / SIMULATOR
+  ══════════════════════════════════════ */
+
+  /* Mastery level pills */
+  .mastery-pill {
+    display: inline-block; padding: 3px 12px; border-radius: 20px;
+    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  }
+  .mastery-expert   { background:#d1fae5; color:#065f46; }
+  .mastery-proficient { background:#dbeafe; color:#1e40af; }
+  .mastery-developing { background:#fef3c7; color:#92400e; }
+  .mastery-beginner { background:#fee2e2; color:#991b1b; }
+
+  /* Forecast chart row */
+  .forecast-bar-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .forecast-bar-label { font-size:12px; font-weight:600; flex:0 0 120px; }
+  .forecast-bar-track { flex:1; height:10px; background:#e2e8f0; border-radius:5px; overflow:visible; position:relative; }
+  .forecast-bar-now  { height:100%; border-radius:5px; position:absolute; left:0; top:0; }
+  .forecast-bar-proj { height:100%; border-radius:5px; position:absolute; left:0; top:0; opacity:.35; }
+  .forecast-bar-pcts { font-size:11px; color:var(--muted); flex:0 0 80px; text-align:right; }
+
+  /* Warning risk badge */
+  .risk-badge {
+    display:inline-flex; align-items:center; gap:5px;
+    padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700;
+  }
+  .risk-high   { background:#fee2e2; color:#991b1b; }
+  .risk-medium { background:#fef3c7; color:#92400e; }
+  .risk-low    { background:#d1fae5; color:#065f46; }
+
+  /* Goal rows */
+  .goal-row {
+    display:flex; align-items:center; gap:10px; padding:10px 0;
+    border-bottom:1px solid var(--border);
+  }
+  .goal-row:last-child { border-bottom:none; }
+  .goal-check { width:20px; height:20px; border-radius:50%; border:2px solid var(--border);
+    display:flex; align-items:center; justify-content:center; flex-shrink:0; cursor:pointer;
+    font-size:11px; transition:background .15s, border-color .15s; }
+  .goal-check.done { background:var(--success); border-color:var(--success); color:#fff; }
+  .goal-info { flex:1; }
+  .goal-title { font-size:13px; font-weight:600; }
+  .goal-deadline { font-size:11px; color:var(--muted); }
+  .goal-progress { font-size:11px; font-weight:700; }
+
+  /* Quiz styles */
+  .quiz-question { font-size:14px; font-weight:600; margin-bottom:14px; line-height:1.5; }
+  .quiz-options { display:flex; flex-direction:column; gap:8px; }
+  .quiz-option {
+    padding:10px 14px; border:1.5px solid var(--border); border-radius:8px;
+    cursor:pointer; font-size:13px; transition:background .15s, border-color .15s;
+    display:flex; align-items:center; gap:8px;
+  }
+  .quiz-option:hover { background:#f0f4f8; border-color:var(--accent); }
+  .quiz-option.correct { background:#d1fae5; border-color:var(--success); }
+  .quiz-option.wrong   { background:#fee2e2; border-color:var(--danger); }
+  .quiz-option.selected { border-color:var(--accent); background:#eff6ff; }
+  .quiz-option .opt-key {
+    width:22px; height:22px; border-radius:50%; background:var(--border);
+    display:flex; align-items:center; justify-content:center;
+    font-size:10px; font-weight:700; flex-shrink:0;
+  }
+  .quiz-progress-bar { height:4px; background:#e2e8f0; border-radius:2px; margin-bottom:20px; overflow:hidden; }
+  .quiz-progress-fill { height:100%; background:var(--accent); border-radius:2px; transition:width .3s; }
+  .quiz-result-screen { text-align:center; padding:20px 0; }
+  .quiz-score-big { font-size:56px; font-weight:800; }
+  .quiz-score-label { font-size:14px; color:var(--muted); margin-top:4px; }
+
+  /* Report card */
+  .rc-header { text-align:center; padding-bottom:16px; border-bottom:2px solid var(--text); margin-bottom:16px; }
+  .rc-title { font-size:18px; font-weight:800; }
+  .rc-subtitle { font-size:12px; color:var(--muted); }
+  .rc-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .rc-table th { background:#f7f8fa; font-size:11px; font-weight:700; text-transform:uppercase;
+    letter-spacing:.04em; padding:6px 10px; border:1px solid var(--border); color:var(--muted); }
+  .rc-table td { padding:8px 10px; border:1px solid var(--border); }
+  .rc-grade { font-weight:800; font-size:14px; }
+
+  /* Learning path timeline */
+  .lp-timeline { position:relative; padding-left:32px; }
+  .lp-timeline::before { content:""; position:absolute; left:11px; top:0; bottom:0; width:2px; background:var(--border); }
+  .lp-step { position:relative; margin-bottom:20px; }
+  .lp-dot {
+    position:absolute; left:-32px; top:2px;
+    width:22px; height:22px; border-radius:50%; border:2px solid var(--border);
+    background:var(--surface); display:flex; align-items:center; justify-content:center;
+    font-size:10px; font-weight:800; color:var(--muted);
+  }
+  .lp-dot.done { background:var(--success); border-color:var(--success); color:#fff; }
+  .lp-dot.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .lp-step-title { font-size:13px; font-weight:700; }
+  .lp-step-sub { font-size:12px; color:var(--muted); margin-top:2px; }
+  .lp-step-badge { margin-top:4px; }
+
+  /* Feedback block */
+  .fb-section { margin-bottom:14px; padding:12px 14px; background:#fafafa;
+    border:1px solid var(--border); border-radius:8px; }
+  .fb-section-title { font-size:11px; font-weight:700; color:var(--muted);
+    text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px; }
+  .fb-text { font-size:13px; line-height:1.65; color:var(--text); }
+
+  /* Exam simulator */
+  .exam-timer {
+    display:inline-flex; align-items:center; gap:6px;
+    background:#fee2e2; color:#991b1b; padding:4px 12px;
+    border-radius:20px; font-size:12px; font-weight:700;
+  }
+  .exam-timer.ok { background:#d1fae5; color:#065f46; }
+  .exam-status-bar {
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:16px; flex-wrap:wrap; gap:8px;
+  }
+
+  /* Lab simulator */
+  .lab-component {
+    border:2px solid var(--border); border-radius:8px; padding:12px 14px;
+    cursor:pointer; transition:border-color .15s, background .15s; text-align:center;
+  }
+  .lab-component:hover { border-color:var(--accent); background:#eff6ff; }
+  .lab-component.fault { border-color:var(--danger); background:#fff5f5; }
+  .lab-component.ok    { border-color:var(--success); background:#f0fff4; }
+  .lab-component .lc-icon { font-size:28px; margin-bottom:4px; }
+  .lab-component .lc-name { font-size:11px; font-weight:700; color:var(--muted); }
+  .lab-component .lc-status { font-size:10px; margin-top:4px; font-weight:600; }
+
+  /* What-if simulator */
+  .whatif-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+  .whatif-label { font-size:12px; font-weight:600; flex:0 0 120px; }
+  .whatif-result-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-top:16px; }
+  .whatif-cert-card { background:#f7f8fa; border:1px solid var(--border); border-radius:10px;
+    padding:14px; text-align:center; }
+  .whatif-cert-pct { font-size:28px; font-weight:800; }
+  .whatif-cert-name { font-size:11px; color:var(--muted); margin-top:4px; font-weight:600; }
+  .whatif-delta { font-size:11px; font-weight:700; margin-top:4px; }
+
+  /* Skills challenge */
+  .challenge-stat { text-align:center; }
+  .challenge-stat-val { font-size:32px; font-weight:800; }
+  .challenge-stat-lbl { font-size:11px; color:var(--muted); font-weight:600; margin-top:2px; }
+  .challenge-q { background:#f7f8fa; border:1px solid var(--border); border-radius:10px;
+    padding:16px; margin-bottom:12px; }
+  .challenge-q .cq-prompt { font-size:13px; font-weight:600; margin-bottom:10px; }
+  .challenge-answer { display:flex; gap:8px; }
+  .challenge-answer input { flex:1; border:1.5px solid var(--border); border-radius:6px;
+    padding:7px 10px; font-size:13px; outline:none; }
+  .challenge-answer input:focus { border-color:var(--accent); }
+  .challenge-streak { display:flex; gap:4px; flex-wrap:wrap; }
+  .streak-dot { width:14px; height:14px; border-radius:50%; background:#e2e8f0; }
+  .streak-dot.hit  { background:var(--success); }
+  .streak-dot.miss { background:var(--danger); }
+</style>
+</head>
+<body>
+
+<!-- PRINT-ONLY OFFICIAL HEADER -->
+<div id="print-header" style="padding:20px 28px 14px;border-bottom:2px solid #1a202c;margin-bottom:20px;">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+    <div>
+      <div style="font-size:20px;font-weight:800;letter-spacing:-.01em;">TVET Learning Platform</div>
+      <div style="font-size:12px;color:#555;margin-top:2px;">Official Student Progress Report</div>
+    </div>
+    <div style="text-align:right;font-size:11px;color:#555;">
+      <div>Report Date: <strong id="print-date"></strong></div>
+      <div>Student: <strong>Amirah Mahsuri</strong></div>
+      <div>Cohort: <strong>2026-B</strong></div>
+    </div>
+  </div>
+</div>
+
+<!-- SIDEBAR OVERLAY (mobile) -->
+<div id="sidebar-overlay" onclick="closeMobileSidebar()"></div>
+
+<!-- TOP NAV -->
+<nav class="topbar">
+  <div class="topbar-brand">
+    <button id="mob-menu-btn" onclick="toggleMobileSidebar()" aria-label="Menu">☰</button>
+    <div class="logo">TL</div>
+    TVET Learning Platform
+  </div>
+  <div class="topbar-right">
+    <div class="role-toggle" id="role-toggle">
+      <button id="btn-student" onclick="setRole('student')">👤 Student</button>
+      <button id="btn-lecturer" onclick="setRole('lecturer')" class="active">🎓 Lecturer</button>
+    </div>
+    <div class="lang-toggle" id="lang-toggle">
+      <button id="btn-bm" onclick="setLang('bm')" data-i18n="nav.bm">BM</button>
+      <button id="btn-en" onclick="setLang('en')" class="active" data-i18n="nav.en">EN</button>
+    </div>
+    <button class="btn btn-success btn-sm no-print" id="btn-import-excel" onclick="openImportModal()" title="Import student records from Excel">📂 Import Excel</button>
+    <button class="btn btn-outline btn-sm no-print" onclick="resetDemoData()" title="Reset to original demo data" data-i18n="nav.reset">↺ Reset Demo</button>
+    <button class="btn btn-primary btn-sm no-print" onclick="exportPDF()" data-i18n="nav.pdf">🖨 Export PDF</button>
+    <button class="btn btn-sm btn-purple no-print" onclick="openQR()" data-i18n="nav.qr">📲 Share QR</button>
+    <span class="badge-pill" id="role-badge" data-i18n="nav.lecturerView">Lecturer View</span>
+    <div class="avatar">SF</div>
+  </div>
+</nav>
+
+<!-- STUDENT SELECTOR BAR (shown after Excel import) -->
+<div id="student-bar">
+  <label>📋 Student:</label>
+  <select id="student-select" onchange="switchStudent(this.value)">
+    <option value="0">Amirah Mahsuri</option>
+  </select>
+  <span class="student-bar-meta">Cohort: <strong id="bar-cohort">2026-B</strong> &nbsp;·&nbsp; Programme: <strong id="bar-programme">Electrical Engineering</strong></span>
+  <span id="import-status">✅ <span id="import-count">1</span> student(s) loaded</span>
+</div>
+
+<!-- IMPORT MODAL -->
+<div class="modal-overlay" id="import-modal">
+  <div class="modal-box" style="max-width:520px;">
+    <button class="modal-close" onclick="closeImportModal()">×</button>
+    <h3>📂 Import Student Records</h3>
+    <p>Upload an Excel file (.xlsx / .xls) with student scores. Download the template below to get started.</p>
+    <a href="students_template.xlsx" download class="btn btn-outline btn-sm" style="margin-bottom:4px;">⬇ Download Template (.xlsx)</a>
+    <div class="import-drop" id="import-drop"
+         onclick="document.getElementById('excel-file-input').click()"
+         ondragover="event.preventDefault();this.classList.add('drag-over')"
+         ondragleave="this.classList.remove('drag-over')"
+         ondrop="handleExcelDrop(event)">
+      <div class="drop-icon">📊</div>
+      <p>Drag & drop your Excel file here, or <strong>click to browse</strong></p>
+      <p style="font-size:11px;margin-top:6px;">Supported: .xlsx, .xls &nbsp;·&nbsp; Max 500 rows</p>
+    </div>
+    <input type="file" id="excel-file-input" accept=".xlsx,.xls" style="display:none;" onchange="handleExcelFile(this.files[0])"/>
+    <div id="import-preview-area"></div>
+    <div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end;" id="import-confirm-row" style="display:none;">
+      <button class="btn btn-outline btn-sm" onclick="closeImportModal()">Cancel</button>
+      <button class="btn btn-success btn-sm" id="btn-confirm-import" onclick="confirmImport()" style="display:none;">✔ Load Students</button>
+    </div>
+  </div>
+</div>
+
+<!-- HIDDEN FILE INPUT (also used programmatically) -->
+
+<!-- APP SHELL -->
+<div id="app-shell">
+
+  <!-- ═══════════ SIDEBAR ═══════════ -->
+  <aside id="sidebar">
+
+    <div class="sidebar-header">
+      <div class="sidebar-logo-row">
+        <div class="sidebar-logo-icon">TL</div>
+        <span class="sidebar-logo-text">TVET Platform</span>
+      </div>
+      <button class="sidebar-toggle" id="sidebar-collapse-btn" onclick="toggleSidebar()" title="Collapse sidebar">‹</button>
+    </div>
+
+    <nav class="sidebar-nav">
+
+      <div class="sidebar-section-label" data-i18n="sidebar.overview">Overview</div>
+      <div class="nav-item active" data-panel="panel-overview" data-tip="Overview" onclick="navTo('panel-overview',this)">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label" data-i18n="sidebar.home">Overview</span>
+      </div>
+      <div class="nav-item" data-panel="panel-profile" data-tip="Student Profile" onclick="navTo('panel-profile',this)">
+        <span class="nav-icon">👤</span>
+        <span class="nav-label" data-i18n="sidebar.profile">Student Profile</span>
+      </div>
+
+      <div class="sidebar-section-label" data-i18n="sidebar.performance">Performance</div>
+      <div class="nav-item" data-panel="panel-scores" data-tip="Scores &amp; Radar" onclick="navTo('panel-scores',this)">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label" data-i18n="sidebar.scores">Scores &amp; Radar</span>
+      </div>
+      <div class="nav-item" data-panel="panel-gap" data-tip="Skill Gap" onclick="navTo('panel-gap',this)">
+        <span class="nav-icon">📉</span>
+        <span class="nav-label" data-i18n="sidebar.gap">Skill Gap</span>
+      </div>
+      <div class="nav-item" data-panel="panel-activity" data-tip="Weekly Activity" onclick="navTo('panel-activity',this)">
+        <span class="nav-icon">⏱️</span>
+        <span class="nav-label" data-i18n="sidebar.activity">Weekly Activity</span>
+      </div>
+
+      <div class="sidebar-section-label" data-i18n="sidebar.aiFeatures">AI Features</div>
+      <div class="nav-item" data-panel="panel-recs" data-tip="AI Recommendations" onclick="navTo('panel-recs',this)">
+        <span class="nav-icon">🤖</span>
+        <span class="nav-label" data-i18n="sidebar.recs">AI Recommendations</span>
+        <span class="nav-badge" id="sidebar-rec-badge" style="display:none;">0</span>
+      </div>
+      <div class="nav-item" data-panel="panel-plan" data-tip="Weekly Study Plan" onclick="navTo('panel-plan',this)">
+        <span class="nav-icon">📅</span>
+        <span class="nav-label" data-i18n="sidebar.plan">Weekly Study Plan</span>
+      </div>
+      <div class="nav-item" data-panel="panel-certs" data-tip="Certifications" onclick="navTo('panel-certs',this)">
+        <span class="nav-icon">🏆</span>
+        <span class="nav-label" data-i18n="sidebar.certs">Certifications</span>
+      </div>
+
+      <div class="sidebar-section-label" data-i18n="sidebar.aiInsights">AI Insights</div>
+      <div class="nav-item" data-panel="panel-profiler" data-tip="Skill Profiler" onclick="navTo('panel-profiler',this)">
+        <span class="nav-icon">🔍</span>
+        <span class="nav-label" data-i18n="sidebar.profiler">Skill Profiler</span>
+      </div>
+      <div class="nav-item" data-panel="panel-forecast" data-tip="Progress Forecast" onclick="navTo('panel-forecast',this)">
+        <span class="nav-icon">📈</span>
+        <span class="nav-label" data-i18n="sidebar.forecast">Progress Forecast</span>
+      </div>
+      <div class="nav-item" data-panel="panel-warning" data-tip="Early Warning" onclick="navTo('panel-warning',this)">
+        <span class="nav-icon">⚠️</span>
+        <span class="nav-label" data-i18n="sidebar.warning">Early Warning</span>
+      </div>
+      <div class="nav-item" data-panel="panel-goals" data-tip="Goal Planner" onclick="navTo('panel-goals',this)">
+        <span class="nav-icon">🎯</span>
+        <span class="nav-label" data-i18n="sidebar.goals">Goal Planner</span>
+      </div>
+      <div class="nav-item" data-panel="panel-input" data-tip="Performance Input" onclick="navTo('panel-input',this)">
+        <span class="nav-icon">🎛️</span>
+        <span class="nav-label" data-i18n="sidebar.input">Performance Input</span>
+      </div>
+
+      <div class="sidebar-section-label" data-i18n="sidebar.aiTools">AI Tools</div>
+      <div class="nav-item" data-panel="panel-quiz" data-tip="Quiz Generator" onclick="navTo('panel-quiz',this)">
+        <span class="nav-icon">📝</span>
+        <span class="nav-label" data-i18n="sidebar.quiz">Quiz Generator</span>
+      </div>
+      <div class="nav-item" data-panel="panel-exam" data-tip="Exam Simulator" onclick="navTo('panel-exam',this)">
+        <span class="nav-icon">🧪</span>
+        <span class="nav-label" data-i18n="sidebar.exam">Exam Simulator</span>
+      </div>
+      <div class="nav-item" data-panel="panel-challenge" data-tip="Skills Challenge" onclick="navTo('panel-challenge',this)">
+        <span class="nav-icon">🎮</span>
+        <span class="nav-label" data-i18n="sidebar.challenge">Skills Challenge</span>
+      </div>
+      <div class="nav-item" data-panel="panel-lab" data-tip="Lab Fault Simulator" onclick="navTo('panel-lab',this)">
+        <span class="nav-icon">🔧</span>
+        <span class="nav-label" data-i18n="sidebar.lab">Lab Fault Sim</span>
+      </div>
+      <div class="nav-item" data-panel="panel-whatif" data-tip="What-If Simulator" onclick="navTo('panel-whatif',this)">
+        <span class="nav-icon">🔀</span>
+        <span class="nav-label" data-i18n="sidebar.whatif">What-If Simulator</span>
+      </div>
+      <div class="nav-item" data-panel="panel-learningpath" data-tip="Learning Path" onclick="navTo('panel-learningpath',this)">
+        <span class="nav-icon">🗂️</span>
+        <span class="nav-label" data-i18n="sidebar.lp">Learning Path</span>
+      </div>
+      <div class="nav-item" data-panel="panel-reportcard" data-tip="Report Card" onclick="navTo('panel-reportcard',this)">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label" data-i18n="sidebar.rc">Report Card</span>
+      </div>
+      <div class="nav-item" data-panel="panel-feedback" data-tip="Feedback Generator" onclick="navTo('panel-feedback',this)">
+        <span class="nav-icon">💬</span>
+        <span class="nav-label" data-i18n="sidebar.feedback">Feedback</span>
+      </div>
+
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-user">
+        <div class="sidebar-avatar">SF</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name">Siti Fadzlina</div>
+          <div class="sidebar-user-role" id="sidebar-role-label">Lecturer</div>
+        </div>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ═══════════ MAIN CONTENT ═══════════ -->
+  <main id="main-content">
+    <div class="page">
+
+      <!-- ░░░ PANEL: OVERVIEW ░░░ -->
+      <div class="panel active" id="panel-overview">
+        <div class="page-header">
+          <div class="page-header-icon" style="background:#dbeafe;">🏠</div>
+          <div>
+            <div class="page-header-title">Overview</div>
+            <div class="page-header-sub" id="ov-student-sub">Amirah Mahsuri · Cohort 2026-B · TVET Level 3 Electrical Engineering</div>
+          </div>
+        </div>
+        <div class="grid-3" style="margin-bottom:20px;">
+          <!-- Profile mini-card -->
+          <div class="card" style="cursor:pointer;" onclick="navTo('panel-profile',null)">
+            <div class="card-title"><span class="dot" style="background:var(--accent)"></span>Student Profile</div>
+            <div class="profile-header">
+              <div class="profile-avatar" id="ov-avatar">AM</div>
+              <div>
+                <div class="profile-name" id="ov-name">Amirah Mahsuri</div>
+                <div class="profile-role" id="ov-role">TVET Level 3 — Electrical Engineering</div>
+              </div>
+            </div>
+            <div class="cert-chips" style="margin-top:8px;">
+              <span class="chip">⚡ CompTIA ITF+</span>
+              <span class="chip">🔧 SKM Level 3</span>
+              <span class="chip">📋 IEV Wiring</span>
+            </div>
+            <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;color:var(--muted);">Click to view full profile →</div>
+          </div>
+          <!-- Overall Progress -->
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--success)"></span>Overall Progress</div>
+            <div class="metric-value" id="val-overall" style="color:var(--success);">63%</div>
+            <div class="metric-sub">Weighted average across all skill domains</div>
+            <div class="metric-bar" style="margin-top:16px;">
+              <div class="metric-bar-fill" id="bar-overall" style="background:var(--success);width:63%;"></div>
+            </div>
+            <div style="margin-top:12px;display:flex;justify-content:space-between;font-size:11px;color:var(--muted);">
+              <span>0%</span><span>Target: 80%</span><span>100%</span>
+            </div>
+            <div class="ai-narrative" id="ai-narrative">Analysing performance data…</div>
+          </div>
+          <!-- Skill Gap metric -->
+          <div class="card" style="cursor:pointer;" onclick="navTo('panel-gap',null)">
+            <div class="card-title"><span class="dot" style="background:var(--danger)"></span>Skill Gap Score</div>
+            <div class="metric-value" id="gap-score-ov" style="color:var(--danger);">—</div>
+            <div class="metric-sub">Avg. points below target (lower is better)</div>
+            <div class="metric-bar" style="margin-top:12px;">
+              <div class="metric-bar-fill" id="bar-gap-ov" style="background:var(--danger);width:0%;"></div>
+            </div>
+            <div style="margin-top:12px;font-size:11px;color:var(--muted);">Est. ready in <strong id="est-weeks-ov" style="color:var(--accent);">—</strong> weeks · Click for detail →</div>
+          </div>
+        </div>
+        <!-- Quick nav cards row -->
+        <div class="grid-3">
+          <div class="card" style="cursor:pointer;border-left:4px solid var(--purple);" onclick="navTo('panel-recs',null)">
+            <div style="font-size:22px;margin-bottom:8px;">🤖</div>
+            <div style="font-weight:700;font-size:14px;">AI Recommendations</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px;">View flagged skill interventions</div>
+            <div style="margin-top:10px;"><span class="badge-pill" id="ov-rec-badge" style="background:#fee2e2;color:#991b1b;">0 items</span></div>
+          </div>
+          <div class="card" style="cursor:pointer;border-left:4px solid var(--accent);" onclick="navTo('panel-plan',null)">
+            <div style="font-size:22px;margin-bottom:8px;">📅</div>
+            <div style="font-weight:700;font-size:14px;">Weekly Study Plan</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px;">AI-generated Mon–Fri timetable</div>
+          </div>
+          <div class="card" style="cursor:pointer;border-left:4px solid var(--success);" onclick="navTo('panel-certs',null)">
+            <div style="font-size:22px;margin-bottom:8px;">🏆</div>
+            <div style="font-weight:700;font-size:14px;">Certifications</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px;">Readiness scores &amp; target certs</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ░░░ PANEL: STUDENT PROFILE ░░░ -->
+      <div class="panel" id="panel-profile">
+        <div class="page-header">
+          <div class="page-header-icon" style="background:#dbeafe;">👤</div>
+          <div>
+            <div class="page-header-title">Student Profile</div>
+            <div class="page-header-sub">Personal details, certifications &amp; achievements</div>
+          </div>
+        </div>
+        <div class="grid-2" style="grid-template-columns:1fr 1fr;">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--accent)"></span>Identity</div>
+            <div class="profile-header">
+              <div class="profile-avatar" id="prof-avatar">AM</div>
+              <div>
+                <div class="profile-name" id="prof-name">Amirah Mahsuri</div>
+                <div class="profile-role" id="prof-role">TVET Level 3 — Electrical Engineering</div>
+              </div>
+            </div>
+            <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);display:flex;gap:20px;">
+              <div><div style="font-size:11px;color:var(--muted);font-weight:600;">Cohort</div><div id="prof-cohort" style="font-size:13px;font-weight:700;">2026-B</div></div>
+              <div><div style="font-size:11px;color:var(--muted);font-weight:600;">Instructor</div><div style="font-size:13px;font-weight:700;">Siti Fadzlina</div></div>
+              <div><div style="font-size:11px;color:var(--muted);font-weight:600;">Status</div><div style="font-size:13px;font-weight:700;color:var(--success);">Active ●</div></div>
+            </div>
+            <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">
+              <div style="font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:600;">Target Certifications</div>
+              <div class="cert-chips">
+                <span class="chip">⚡ CompTIA ITF+</span>
+                <span class="chip">🔧 SKM Level 3</span>
+                <span class="chip">📋 IEV Wiring</span>
+              </div>
+            </div>
+            <div id="badges-section" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);display:none;">
+              <div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600;">🏅 Achievements</div>
+              <div class="cert-chips" id="badges-chips"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--success)"></span>Certification Readiness</div>
+            <div class="cert-readiness" style="margin-top:0;padding-top:0;border-top:none;">
+              <div class="cert-readiness-row">
+                <span class="cert-readiness-label">⚡ CompTIA ITF+</span>
+                <div class="cert-readiness-bar"><div class="cert-readiness-fill" id="cr-comptia" style="background:var(--accent);width:0%;"></div></div>
+                <span class="cert-readiness-pct" id="cr-comptia-pct" style="color:var(--accent);">0%</span>
+              </div>
+              <div class="cert-readiness-row">
+                <span class="cert-readiness-label">🔧 SKM Level 3</span>
+                <div class="cert-readiness-bar"><div class="cert-readiness-fill" id="cr-skm" style="background:var(--purple);width:0%;"></div></div>
+                <span class="cert-readiness-pct" id="cr-skm-pct" style="color:var(--purple);">0%</span>
+              </div>
+              <div class="cert-readiness-row" style="margin-bottom:0;">
+                <span class="cert-readiness-label">📋 IEV Wiring</span>
+                <div class="cert-readiness-bar"><div class="cert-readiness-fill" id="cr-iev" style="background:var(--success);width:0%;"></div></div>
+                <span class="cert-readiness-pct" id="cr-iev-pct" style="color:var(--success);">0%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ░░░ PANEL: SCORES & RADAR ░░░ -->
+      <div class="panel" id="panel-scores">
+        <div class="page-header">
+          <div class="page-header-icon" style="background:#ede9fe;">📊</div>
+          <div>
+            <div class="page-header-title">Scores &amp; Radar</div>
+            <div class="page-header-sub">Score summary table, sparkline trends &amp; proficiency radar chart</div>
+          </div>
+        </div>
+        <div class="grid-2 section-gap" id="lecturer-row" style="margin-bottom:20px;grid-template-columns:1fr 1fr;">
+          <div style="display:flex;flex-direction:column;gap:16px;">
+            <div class="card" id="card-perf-input">
+              <div class="card-title"><span class="dot" style="background:var(--warn)"></span>Performance Input</div>
+              <div class="form-section">
+                <div class="form-grid" id="score-inputs"></div>
+                <div style="margin-top:16px;display:flex;gap:10px;justify-content:flex-end;">
+                  <button class="btn btn-outline btn-sm" onclick="resetScores()">Reset</button>
+                  <button class="btn btn-primary btn-sm" onclick="applyScores()">&#10003; Apply &amp; Analyse</button>
+                </div>
+              </div>
+            </div>
+            <div class="card" id="card-score-summary">
+              <div class="card-title"><span class="dot" style="background:var(--text)"></span>Score Summary</div>
+              <table class="scores-table" id="scores-table">
+                <thead><tr><th>Category</th><th>Score</th><th>Target</th><th>Gap</th><th>Status</th></tr></thead>
+                <tbody id="scores-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card" id="card-radar" style="display:flex;flex-direction:column;">
+            <div class="card-title"><span class="dot" style="background:var(--purple)"></span>Performance vs Target Proficiency</div>
+            <div class="chart-wrap" style="flex:1;display:flex;align-items:center;justify-content:center;">
+              <canvas id="radarChart" style="max-width:340px;max-height:340px;"></canvas>
+            </div>
+            <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;gap:20px;justify-content:center;">
+              <div style="display:flex;align-items:center;gap:6px;font-size:12px;"><span style="width:12px;height:12px;border-radius:50%;background:#3b82f6;display:inline-block;"></span>Current</div>
+              <div style="display:flex;align-items:center;gap:6px;font-size:12px;"><span style="width:12px;height:12px;border-radius:50%;background:#7c3aed;display:inline-block;"></span>Target</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ░░░ PANEL: SKILL GAP ░░░ -->
+      <div class="panel" id="panel-gap">
+        <div class="page-header">
+          <div class="page-header-icon" style="background:#fee2e2;">📉</div>
+          <div>
+            <div class="page-header-title">Skill Gap Analysis</div>
+            <div class="page-header-sub">Gap breakdown, completion projection &amp; intervention status</div>
+          </div>
+        </div>
+        <div class="card" style="display:flex;flex-direction:column;gap:14px;max-width:480px;">
+          <div class="card-title"><span class="dot" style="background:var(--danger)"></span>Skill Gap Score</div>
+          <div>
+            <div class="metric-value" id="gap-score" style="color:var(--danger);">37</div>
+            <div class="metric-sub">Points below target proficiency (lower is better)</div>
+            <div class="metric-bar" style="margin-top:12px;">
+              <div class="metric-bar-fill" id="bar-gap" style="background:var(--danger);width:37%;"></div>
+            </div>
+          </div>
+          <div style="padding-top:12px;border-top:1px solid var(--border);font-size:12px;color:var(--muted);line-height:1.7;">
+            <div style="display:flex;justify-content:space-between;"><span>Skills at target</span><span id="skills-ok" style="font-weight:700;color:var(--success);">0 / 0</span></div>
+            <div style="display:flex;justify-content:space-between;"><span>Skills below 70%</span><span id="skills-below" style="font-weight:700;color:var(--danger);">0</span></div>
+            <div style="display:flex;justify-content:space-between;"><span>Avg. gap per skill</span><span id="avg-gap" style="font-weight:700;">0 pts</span></div>
+          </div>
+          <div style="padding-top:12px;border-top:1px solid var(--border);">
+            <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:8px;">COMPLETION PROJECTION</div>
+            <div style="font-size:13px;font-weight:600;">Est. ready in <span id="est-weeks" style="color:var(--accent);">—</span> weeks</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">Based on current weekly hours &amp; gap</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ░░░ PANEL: AI RECOMMENDATIONS ░░░ -->
+      <div class="panel" id="panel-recs">
+        <div class="page-header">
+          <div class="page-header-icon" style="background:#ffe4e6;">🤖</div>
+          <div>
+            <div class="page-header-title">AI Recommendations</div>
+            <div class="page-header-sub">Flagged skill gaps with targeted activities &amp; WhatsApp alerts</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title" style="justify-content:space-between;">
+            <span style="display:flex;align-items:center;gap:6px;"><span class="dot" style="background:var(--danger)"></span>Active Recommendations</span>
+            <span class="badge-pill" id="rec-count-badge" style="background:#fee2e2;color:#991b1b;">0 items</span>
+          </div>
+          <div id="rec-container" class="rec-list"></div>
+        </div>
+      </div>
+
+      <!-- ░░░ PANEL: WEEKLY STUDY PLAN ░░░ -->
+      <div class="panel" id="panel-plan">
+        <div class="page-header">
+          <div class="page-header-icon" style="background:#dbeafe;">📅</div>
+          <div>
+            <div class="page-header-title">AI Weekly Study Plan</div>
+            <div class="page-header-sub">Auto-generated Mon–Fri timetable weighted by skill gap severity</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title" style="justify-content:space-between;">
+            <span style="display:flex;align-items:center;gap:6px;"><span class="dot" style="background:var(--accent)"></span>This Week's Plan</span>
+            <span style="font-size:11px;color:var(--muted);font-weight:600;">14.5 hrs/week</span>
+          </div>
+          <div id="week-plan-container"></div>
+        </div>
+      </div>
+
+      <!-- ░░░ PANEL: CERTIFICATIONS ░░░ -->
+      <div class="panel" id="panel-certs">
+        <div class="page-header">
+          <div class="page-header-icon" style="background:#d1fae5;">🏆</div>
+          <div>
+            <div class="page-header-title">Certifications</div>
+            <div class="page-header-sub">AI readiness scores for all 3 target qualifications</div>
+          </div>
+        </div>
+        <div class="grid-3">
+          <div class="card" style="text-align:center;">
+            <div style="font-size:32px;margin-bottom:8px;">⚡</div>
+            <div style="font-weight:700;font-size:15px;margin-bottom:4px;">CompTIA ITF+</div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:14px;">IT Fundamentals</div>
+            <div style="font-size:36px;font-weight:800;color:var(--accent);" id="cert-comptia-big">0%</div>
+            <div class="metric-bar" style="margin-top:10px;"><div class="metric-bar-fill" id="cr-comptia" style="background:var(--accent);width:0%;"></div></div>
+            <div style="font-size:11px;color:var(--muted);margin-top:8px;">Knowledge · Problem Solving · Practical · Communication</div>
+          </div>
+          <div class="card" style="text-align:center;">
+            <div style="font-size:32px;margin-bottom:8px;">🔧</div>
+            <div style="font-weight:700;font-size:15px;margin-bottom:4px;">SKM Level 3</div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:14px;">Sijil Kemahiran Malaysia</div>
+            <div style="font-size:36px;font-weight:800;color:var(--purple);" id="cert-skm-big">0%</div>
+            <div class="metric-bar" style="margin-top:10px;"><div class="metric-bar-fill" id="cr-skm" style="background:var(--purple);width:0%;"></div></div>
+            <div style="font-size:11px;color:var(--muted);margin-top:8px;">Practical · Safety · Problem Solving · Affective</div>
+          </div>
+          <div class="card" style="text-align:center;">
+            <div style="font-size:32px;margin-bottom:8px;">📋</div>
+            <div style="font-weight:700;font-size:15px;margin-bottom:4px;">IEV Wiring</div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:14px;">Internal Electrical Wiring</div>
+            <div style="font-size:36px;font-weight:800;color:var(--success);" id="cert-iev-big">0%</div>
+            <div class="metric-bar" style="margin-top:10px;"><div class="metric-bar-fill" id="cr-iev" style="background:var(--success);width:0%;"></div></div>
+            <div style="font-size:11px;color:var(--muted);margin-top:8px;">Safety · Practical · Knowledge · Affective</div>
+          </div>
+        </div>
+        <!-- profile cert readiness IDs also referenced by renderCertReadiness - keep these hidden -->
+        <span id="cr-comptia-pct" style="display:none;"></span>
+        <span id="cr-skm-pct" style="display:none;"></span>
+        <span id="cr-iev-pct" style="display:none;"></span>
+      </div>
+
+      <!-- ░░░ PANEL: PERFORMANCE INPUT ░░░ -->
+      <div class="panel" id="panel-input">
+        <div class="page-header">
+          <div class="page-header-icon" style="background:#fef3c7;">🎛️</div>
+          <div>
+            <div class="page-header-title">Performance Input</div>
+            <div class="page-header-sub">Lecturer view — adjust skill scores and re-run the AI analysis</div>
+          </div>
+        </div>
+        <div class="card" id="card-perf-input-2">
+          <div class="card-title"><span class="dot" style="background:var(--warn)"></span>Skill Score Sliders</div>
+          <div class="form-section">
+            <div class="form-grid" id="score-inputs-2"></div>
+            <div style="margin-top:16px;display:flex;gap:10px;justify-content:flex-end;">
+              <button class="btn btn-outline btn-sm" onclick="resetScores()">Reset</button>
+              <button class="btn btn-primary btn-sm" onclick="applyScores()">&#10003; Apply &amp; Analyse</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ░░░ PANEL: WEEKLY ACTIVITY ░░░ -->
+      <div class="panel" id="panel-activity">
+        <div class="page-header">
+          <div class="page-header-icon" style="background:#ede9fe;">⏱️</div>
+          <div>
+            <div class="page-header-title">Weekly Activity</div>
+            <div class="page-header-sub">Daily study hours this week across all modules</div>
+          </div>
+        </div>
+        <div class="card" style="max-width:460px;">
+          <div class="card-title"><span class="dot" style="background:var(--purple)"></span>Study Hours</div>
+          <div class="metric-value" style="color:var(--purple);">14.5 <span style="font-size:14px;font-weight:500;">hrs</span></div>
+          <div class="metric-sub">Hours spent this week across all modules</div>
+          <div style="margin-top:14px;display:grid;grid-template-columns:repeat(7,1fr);gap:4px;align-items:flex-end;height:80px;">
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;"><div style="width:100%;background:#dbeafe;border-radius:4px;height:40%;"></div><div style="font-size:10px;color:var(--muted);margin-top:4px;">Mon</div></div>
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;"><div style="width:100%;background:#93c5fd;border-radius:4px;height:70%;"></div><div style="font-size:10px;color:var(--muted);margin-top:4px;">Tue</div></div>
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;"><div style="width:100%;background:#3b82f6;border-radius:4px;height:90%;"></div><div style="font-size:10px;color:var(--muted);margin-top:4px;">Wed</div></div>
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;"><div style="width:100%;background:#93c5fd;border-radius:4px;height:55%;"></div><div style="font-size:10px;color:var(--muted);margin-top:4px;">Thu</div></div>
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;"><div style="width:100%;background:#dbeafe;border-radius:4px;height:30%;"></div><div style="font-size:10px;color:var(--muted);margin-top:4px;">Fri</div></div>
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;"><div style="width:100%;background:#3b82f6;border-radius:4px;height:80%;"></div><div style="font-size:10px;color:var(--muted);margin-top:4px;">Sat</div></div>
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;"><div style="width:100%;background:#dbeafe;border-radius:4px;height:20%;"></div><div style="font-size:10px;color:var(--muted);margin-top:4px;">Sun</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════
+           AI FUNCTIONS PANELS
+      ═════════════════════════════════════ -->
+
+      <!-- ░░░ PANEL: SKILL PROFILER ░░░ -->
+      <div class="panel" id="panel-profiler">
+        <div class="page-header">
+          <div class="page-header-icon" style="background:#dbeafe;">🔍</div>
+          <div>
+            <div class="page-header-title">Smart Skill Profiler</div>
+            <div class="page-header-sub">AI-driven mastery classification across all 6 skill domains</div>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--accent)"></span>Mastery Levels</div>
+            <div id="profiler-list"></div>
+            <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
+              <div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:8px;">LEGEND</div>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                <span class="mastery-pill mastery-expert">Expert ≥85%</span>
+                <span class="mastery-pill mastery-proficient">Proficient 70–84%</span>
+                <span class="mastery-pill mastery-developing">Developing 50–69%</span>
+                <span class="mastery-pill mastery-beginner">Beginner &lt;50%</span>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--purple)"></span>Profile Summary</div>
+            <div id="profiler-summary"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ░░░ PANEL: PROGRESS FORECASTER ░░░ -->
+      <div class="panel" id="panel-forecast">
+        <div class="page-header">
+          <div class="page-header-icon" style="background:#d1fae5;">📈</div>
+          <div>
+            <div class="page-header-title">Progress Forecaster</div>
+            <div class="page-header-sub">Projects each skill's score at 4, 8, and 12 weeks at current study pace</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title" style="justify-content:space-between;">
+            <span style="display:flex;align-items:center;gap:6px;"><span class="dot" style="background:var(--success)"></span>Score Trajectory</span>
+            <div style="display:flex;gap:12px;font-size:11px;">
+              <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:var(--accent);display:inline-block;"></span>Now</span>
+              <span style="display:flex;align-items:center;gap:4px;opacity:.4;"><span style="width:10px;height:10px;border-radius:2px;background:var(--success);display:inline-block;"></span>+12 wks</span>
+            </div>
+          </div>
+          <div style="margin-bottom:10px;font-size:12px;color:var(--muted);">Based on <strong>14.5 hrs/week</strong> and an estimated <strong>1.8 pts/hr</strong> improvement rate.</div>
+          <div id="forecast-bars"></div>
+        </div>
+      </div>
+
+      <!-- ░░░ PANEL: EARLY WARNING ░░░ -->
+      <div class="panel" id="panel-warning">
+        <div class="page-header">
+          <div class="page-header-icon" style="background:#fef3c7;">⚠️</div>
+          <div>
+            <div class="page-header-title">Early Warning Detector</div>
+            <div class="page-header-sub">Multi-factor risk assessment to flag at-risk students before they fall behind</div>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--warn)"></span>Risk Factors</div>
+            <div id="warning-factors"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--danger)"></span>Overall Risk Rating</div>
+            <div id="warning-overall" style="text-align:center;padding:20px 0;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ░░░ PANEL: GOAL PLANNER ░░░ -->
+      <div class="panel" id="panel-goals">
+        <div class="page-header">
+          <div class="page-header-icon" style="background:#ede9fe;">🎯</div>
+          <div>
+            <div class="page-header-title">SMART Goal Planner</div>
+            <div class="page-header-sub">Auto-generated SMART goals per skill — click circles to mark milestones complete</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title" style="justify-content:space-between;">
+            <span style="display:flex;align-items:center;gap:6px;"><span class="dot" style="background:var(--purple)"></span>Active Goals</span>
+            <span id="goals-complete-badge" class="badge-pill">0 / 0 complete</span>
+          </div>
+          <div id="goals-list"></div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════
+           AI GENERATOR PANELS
+      ═════════════════════════════════════ -->
+
+      <!-- ░░░ PANEL: QUIZ GENERATOR ░░░ -->
+      <div class="panel" id="panel-quiz">
+        <div class="page-header">
+          <div class="page-header-icon" style="background:#fef3c7;">📝</div>
+          <div>
+            <div class="page-header-title">Quiz Generator</div>
+            <div class="page-header-sub">Generates a 5-question MCQ quiz targeting your weakest skill domains</div>
+          </div>
+        </div>
+        <div class="card" style="max-width:620px;">
+          <div id="quiz-header-bar" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+            <div>
+              <div style="font-size:13px;font-weight:700;" id="quiz-skill-label">—</div>
+              <div style="font-size:11px;color:var(--muted);">Question <span id="quiz-qnum">1</span> of <span id="quiz-total">5</span></div>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="initQuiz()">↺ New Quiz</button>
+          </div>
+          <div class="quiz-progress-bar"><div class="quiz-progress-fill" id="quiz-progress-fill" style="width:0%;"></div></div>
+          <div id="quiz-content"></div>
+        </div>
+      </div>
+
+      <!-- ░░░ PANEL: REPORT CARD GENERATOR ░░░ -->
+      <div class="panel" id="panel-reportcard">
+        <div class="page-header">
+          <div class="page-header-icon" style="background:#d1fae5;">📋</div>
+          <div>
+            <div class="page-header-title">Report Card Generator</div>
+            <div class="page-header-sub">Auto-generates a formatted official report card from current scores</div>
+          </div>
+        </div>
+        <div class="card" style="max-width:640px;">
+          <div style="display:flex;justify-content:flex-end;margin-bottom:16px;gap:8px;">
+            <button class="btn btn-outline btn-sm" onclick="generateReportCard()">↺ Regenerate</button>
+            <button class="btn btn-primary btn-sm no-print" onclick="exportPDF()">🖨 Print</button>
+          </div>
+          <div id="report-card-content"></div>
+        </div>
+      </div>
+
+      <!-- ░░░ PANEL: LEARNING PATH GENERATOR ░░░ -->
+      <div class="panel" id="panel-learningpath">
+        <div class="page-header">
+          <div class="page-header-icon" style="background:#ede9fe;">🗂️</div>
+          <div>
+            <div class="page-header-title">Learning Path Generator</div>
+            <div class="page-header-sub">AI-curated personalised module sequence based on current gap severity</div>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title" style="justify-content:space-between;">
+              <span style="display:flex;align-items:center;gap:6px;"><span class="dot" style="background:var(--purple)"></span>Your Learning Path</span>
+              <button class="btn btn-outline btn-sm" onclick="generateLearningPath()">↺ Regenerate</button>
+            </div>
+            <div class="lp-timeline" id="lp-timeline"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--accent)"></span>Path Stats</div>
+            <div id="lp-stats"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ░░░ PANEL: FEEDBACK GENERATOR ░░░ -->
+      <div class="panel" id="panel-feedback">
+        <div class="page-header">
+          <div class="page-header-icon" style="background:#fee2e2;">💬</div>
+          <div>
+            <div class="page-header-title">Feedback Generator</div>
+            <div class="page-header-sub">Generates personalised written lecturer feedback based on current performance</div>
+          </div>
+        </div>
+        <div class="card" style="max-width:640px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+            <div style="font-size:12px;color:var(--muted);">Tone:
+              <select id="feedback-tone" onchange="generateFeedback()" style="border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:12px;outline:none;margin-left:4px;">
+                <option value="encouraging">Encouraging</option>
+                <option value="formal">Formal</option>
+                <option value="direct">Direct</option>
+              </select>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="generateFeedback()">↺ Regenerate</button>
+          </div>
+          <div id="feedback-content"></div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════
+           AI SIMULATOR PANELS
+      ═════════════════════════════════════ -->
+
+      <!-- ░░░ PANEL: EXAM SIMULATOR ░░░ -->
+      <div class="panel" id="panel-exam">
+        <div class="page-header">
+          <div class="page-header-icon" style="background:#fef3c7;">🧪</div>
+          <div>
+            <div class="page-header-title">Exam Simulator</div>
+            <div class="page-header-sub">Simulates a timed TVET-style exam — 10 questions, 90 seconds each</div>
+          </div>
+        </div>
+        <div class="card" style="max-width:640px;">
+          <div class="exam-status-bar">
+            <div style="font-size:13px;font-weight:700;">Question <span id="exam-qnum">—</span> of <span id="exam-total">10</span></div>
+            <div class="exam-timer ok" id="exam-timer">⏱ —s</div>
+            <div style="font-size:12px;font-weight:600;">Score: <span id="exam-score">0</span></div>
+          </div>
+          <div class="quiz-progress-bar"><div class="quiz-progress-fill" id="exam-progress-fill" style="width:0%;"></div></div>
+          <div id="exam-content"></div>
+        </div>
+      </div>
+
+      <!-- ░░░ PANEL: LAB FAULT SIMULATOR ░░░ -->
+      <div class="panel" id="panel-lab">
+        <div class="page-header">
+          <div class="page-header-icon" style="background:#fee2e2;">🔧</div>
+          <div>
+            <div class="page-header-title">Lab Fault Simulator</div>
+            <div class="page-header-sub">Find the faulty component in the circuit — click each component to inspect it</div>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title" style="justify-content:space-between;">
+              <span style="display:flex;align-items:center;gap:6px;"><span class="dot" style="background:var(--danger)"></span>Circuit Components</span>
+              <button class="btn btn-outline btn-sm" onclick="initLab()">↺ New Fault</button>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;" id="lab-components"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--warn)"></span>Diagnosis Log</div>
+            <div id="lab-log" style="font-size:12px;color:var(--muted);line-height:1.8;min-height:80px;"></div>
+            <div id="lab-result" style="margin-top:12px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ░░░ PANEL: WHAT-IF SIMULATOR ░░░ -->
+      <div class="panel" id="panel-whatif">
+        <div class="page-header">
+          <div class="page-header-icon" style="background:#dbeafe;">📊</div>
+          <div>
+            <div class="page-header-title">What-If Score Simulator</div>
+            <div class="page-header-sub">Drag sliders to see how score changes affect certification readiness in real-time</div>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--accent)"></span>Hypothetical Scores</div>
+            <div id="whatif-sliders"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--purple)"></span>Projected Cert Readiness</div>
+            <div class="whatif-result-grid" id="whatif-results"></div>
+            <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);font-size:11px;color:var(--muted);">
+              <strong style="color:var(--success);">▲</strong> = improvement vs current · <strong style="color:var(--danger);">▼</strong> = regression
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ░░░ PANEL: SKILLS CHALLENGE ░░░ -->
+      <div class="panel" id="panel-challenge">
+        <div class="page-header">
+          <div class="page-header-icon" style="background:#d1fae5;">🎮</div>
+          <div>
+            <div class="page-header-title">Skills Challenge</div>
+            <div class="page-header-sub">Beat the clock — answer 8 rapid-fire skill questions to earn a score multiplier</div>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--success)"></span>Challenge Arena</div>
+            <div id="challenge-arena"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--warn)"></span>Stats &amp; Streak</div>
+            <div class="grid-3" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:16px;">
+              <div class="challenge-stat"><div class="challenge-stat-val" id="ch-score">0</div><div class="challenge-stat-lbl">Score</div></div>
+              <div class="challenge-stat"><div class="challenge-stat-val" id="ch-streak">0</div><div class="challenge-stat-lbl">Streak 🔥</div></div>
+              <div class="challenge-stat"><div class="challenge-stat-val" id="ch-best">0</div><div class="challenge-stat-lbl">Best</div></div>
+            </div>
+            <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:6px;">HIT / MISS HISTORY</div>
+            <div class="challenge-streak" id="ch-streak-dots"></div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /.page -->
+  </main>
+
+</div><!-- /#app-shell -->
+
+<!-- PRINT SIGNATURE BOX -->
+<div id="print-signature" style="max-width:1280px;margin:24px auto 0;padding:20px 28px;border-top:2px solid #1a202c;">
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:40px;margin-top:8px;">
+    <div>
+      <div style="font-size:11px;color:#555;font-weight:600;margin-bottom:32px;">Student Signature</div>
+      <div style="border-top:1px solid #555;padding-top:4px;font-size:11px;color:#555;">Amirah Mahsuri · Date: ___________</div>
+    </div>
+    <div>
+      <div style="font-size:11px;color:#555;font-weight:600;margin-bottom:32px;">Instructor Signature</div>
+      <div style="border-top:1px solid #555;padding-top:4px;font-size:11px;color:#555;">Siti Fadzlina · Date: ___________</div>
+    </div>
+    <div>
+      <div style="font-size:11px;color:#555;font-weight:600;margin-bottom:32px;">Department Head Stamp</div>
+      <div style="border-top:1px solid #555;padding-top:4px;font-size:11px;color:#555;">Official Stamp · Date: ___________</div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- QR Modal -->
+<div class="modal-overlay" id="qr-modal">
+  <div class="modal-box" style="text-align:center;">
+    <button class="modal-close" onclick="closeQR()">×</button>
+    <h3>📲 Share This Dashboard</h3>
+    <p>Scan with your phone camera to open this dashboard on any device.</p>
+    <div id="qr-container"></div>
+    <div style="margin-top:12px;font-size:11px;color:var(--muted);word-break:break-all;" id="qr-url"></div>
+  </div>
+</div>
+
+<!-- FAQ Chatbot FAB -->
+<button id="faq-fab" title="FAQ Assistant" onclick="toggleFAQ()">💬</button>
+
+<!-- FAQ Panel -->
+<div id="faq-panel">
+  <div id="faq-header">
+    <span>🤖 TVET AI Assistant</span>
+    <button onclick="toggleFAQ()">×</button>
+  </div>
+  <div id="faq-messages">
+    <div class="faq-msg bot">Hi! I'm your TVET AI assistant powered by Gemini. Ask me anything about your learning progress! 👇</div>
+  </div>
+  <div class="faq-chip-row" id="faq-chips"></div>
+  <div id="faq-input-row">
+    <input id="faq-input" type="text" placeholder="Ask anything about your progress…" onkeydown="if(event.key==='Enter') sendFAQ()" />
+    <button id="faq-send" onclick="sendFAQ()">Send</button>
+  </div>
+  <!-- FEATURE 4: Gemini API Key Setup -->
+  <div id="gemini-setup">
+    <label for="gemini-key">🔑 Gemini API Key (optional — enables real AI responses)</label>
+    <input type="password" id="gemini-key" placeholder="Paste your Gemini API key here…" oninput="saveGeminiKey(this.value)" />
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// DATA MODEL & DEFAULTS
+// ─────────────────────────────────────────────
+const DEFAULT_SCORES = [45, 85, 60, 52, 78, 67];
+
+const SKILLS = [
+  {
+    id: "knowledge",
+    label: "Knowledge",
+    target: 80,
+    score: 45,
+    activity: "Review the circuit theory flashcard deck and complete Module 3 knowledge check quiz.",
+    resource: "https://www.open.edu/openlearn/science-maths-technology/electrical-engineering",
+    resourceLabel: "OpenLearn — Electrical Engineering"
+  },
+  {
+    id: "practical",
+    label: "Practical Skill",
+    target: 75,
+    score: 85,
+    activity: "Complete the advanced wiring lab simulation and peer-assess one classmate's schematic.",
+    resource: "https://phet.colorado.edu/en/simulations/circuit-construction-kit-dc",
+    resourceLabel: "PhET — Circuit Construction Kit"
+  },
+  {
+    id: "affective",
+    label: "Affective",
+    target: 70,
+    score: 60,
+    activity: "Attend the workplace safety workshop and submit a personal reflection journal entry.",
+    resource: "https://www.osha.gov/training",
+    resourceLabel: "OSHA Safety Training"
+  },
+  {
+    id: "problem_solving",
+    label: "Problem Solving",
+    target: 75,
+    score: 52,
+    activity: "Complete a hands-on debugging lab — isolate faults in a pre-wired control panel board.",
+    resource: "https://www.khanacademy.org/science/electrical-engineering",
+    resourceLabel: "Khan Academy — Electrical Engineering"
+  },
+  {
+    id: "safety",
+    label: "Safety Practices",
+    target: 80,
+    score: 78,
+    activity: "Complete the electrical hazard identification scenario and score ≥ 80% on the risk assessment.",
+    resource: "https://www.hse.gov.uk/electricity/",
+    resourceLabel: "HSE — Electrical Safety Guide"
+  },
+  {
+    id: "communication",
+    label: "Communication",
+    target: 70,
+    score: 67,
+    activity: "Prepare a 5-minute technical briefing on your recent project and present it to your group.",
+    resource: "https://www.coursera.org/learn/technical-writing",
+    resourceLabel: "Coursera — Technical Writing"
+  }
+];
+
+// ─────────────────────────────────────────────
+// LocalStorage Persistence (with history for sparklines)
+// ─────────────────────────────────────────────
+const LS_KEY      = "tvet_scores_v1";
+const LS_HIST_KEY = "tvet_history_v1";
+const LS_BADGE_KEY= "tvet_badges_v1";
+const LS_GEMINI_KEY="tvet_gemini_key";
+const MAX_HISTORY = 10;
+
+function saveToStorage() {
+  const data = SKILLS.reduce((obj, s) => { obj[s.id] = s.score; return obj; }, {});
+  try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch(e) {}
+  // Save timestamped snapshot for sparklines
+  try {
+    const hist = loadHistory();
+    hist.push({ ts: Date.now(), scores: { ...data } });
+    if (hist.length > MAX_HISTORY) hist.splice(0, hist.length - MAX_HISTORY);
+    localStorage.setItem(LS_HIST_KEY, JSON.stringify(hist));
+  } catch(e) {}
+}
+
+function loadFromStorage() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return false;
+    const data = JSON.parse(raw);
+    SKILLS.forEach(s => { if (data[s.id] !== undefined) s.score = data[s.id]; });
+    return true;
+  } catch(e) { return false; }
+}
+
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(LS_HIST_KEY) || "[]"); } catch(e) { return []; }
+}
+
+function resetDemoData() {
+  try { localStorage.removeItem(LS_KEY); } catch(e) {}
+  try { localStorage.removeItem(LS_HIST_KEY); } catch(e) {}
+  try { localStorage.removeItem(LS_BADGE_KEY); } catch(e) {}
+  SKILLS.forEach((s, i) => { s.score = DEFAULT_SCORES[i]; });
+  buildInputs();
+  applyScores();
+  renderBadges([]);
+  showToast("↺ Demo data reset to defaults");
+}
+
+// ─────────────────────────────────────────────
+// FEATURE 2 — Role View Switcher
+// ─────────────────────────────────────────────
+let currentRole = "lecturer";
+
+function setRole(role) {
+  currentRole = role;
+  const isLecturer = role === "lecturer";
+  document.getElementById("card-perf-input").style.display = isLecturer ? "" : "none";
+  document.getElementById("card-score-summary").style.display = isLecturer ? "" : "none";
+  document.getElementById("card-radar").style.display = isLecturer ? "" : "none";
+  document.getElementById("btn-student").classList.toggle("active", !isLecturer);
+  document.getElementById("btn-lecturer").classList.toggle("active", isLecturer);
+  const lecLabel = (typeof t === "function") ? t("nav.lecturerView") : "Lecturer View";
+  const stuLabel = (typeof t === "function") ? t("nav.studentView") : "Student View";
+  document.getElementById("role-badge").textContent = isLecturer ? lecLabel : stuLabel;
+  const sideLabel = (typeof t === "function") ? (isLecturer ? t("role.lecturer") : t("role.student")) : (isLecturer ? "Lecturer" : "Student");
+  document.getElementById("sidebar-role-label").textContent = sideLabel;
+  showToast(isLecturer ? "🎓 Switched to Lecturer View" : "👤 Switched to Student View");
+}
+
+// ─────────────────────────────────────────────
+// RENDER INPUTS
+// ─────────────────────────────────────────────
+function buildInputs() {
+  const container = document.getElementById("score-inputs");
+  container.innerHTML = SKILLS.map(s => `
+    <div class="form-group">
+      <label for="inp-${s.id}">${s.label}</label>
+      <div class="range-row">
+        <input type="range" id="inp-${s.id}" min="0" max="100" value="${s.score}"
+          oninput="document.getElementById('val-${s.id}').textContent = this.value + '%'; SKILLS.find(x=>x.id==='${s.id}').score = +this.value;" />
+        <span class="range-val" id="val-${s.id}">${s.score}%</span>
+      </div>
+    </div>
+  `).join("");
+}
+
+// ─────────────────────────────────────────────
+// RENDER TABLE (with sparklines — Feature 2)
+// ─────────────────────────────────────────────
+function buildSparkline(id) {
+  const hist = loadHistory();
+  if (hist.length < 2) return "";
+  const vals = hist.slice(-5).map(h => h.scores[id] !== undefined ? h.scores[id] : null).filter(v => v !== null);
+  if (vals.length < 2) return "";
+  const W = 40, H = 18, PAD = 2;
+  const minV = Math.min(...vals), maxV = Math.max(...vals);
+  const range = maxV - minV || 1;
+  const pts = vals.map((v, i) => {
+    const x = PAD + (i / (vals.length - 1)) * (W - PAD * 2);
+    const y = H - PAD - ((v - minV) / range) * (H - PAD * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  const trend = vals[vals.length - 1] - vals[0];
+  const color = trend > 0 ? "#10b981" : trend < 0 ? "#ef4444" : "#718096";
+  const arrow = trend > 0 ? "▲" : trend < 0 ? "▼" : "─";
+  return `<span class="sparkline" title="Trend over last ${vals.length} sessions">
+    <svg width="${W}" height="${H}" style="vertical-align:middle;">
+      <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>
+    </svg>
+    <span style="font-size:10px;color:${color};font-weight:700;">${arrow}</span>
+  </span>`;
+}
+
+function renderTable() {
+  const tbody = document.getElementById("scores-tbody");
+  tbody.innerHTML = SKILLS.map(s => {
+    const gap = Math.max(0, s.target - s.score);
+    const pillClass = s.score >= s.target ? "pill-success" : s.score >= 70 ? "pill-warn" : "pill-danger";
+    const statusIcon = s.score >= s.target ? "✔ Met" : s.score >= 70 ? "⚠ Near" : "✗ Below";
+    const barColor = s.score >= s.target ? "var(--success)" : s.score >= 70 ? "var(--warn)" : "var(--danger)";
+    const spark = buildSparkline(s.id);
+    return `
+      <tr>
+        <td style="font-weight:600;">${s.label}</td>
+        <td>
+          <span class="score-pill ${pillClass}">${s.score}%</span>${spark}
+          <div class="mini-bar"><div class="mini-bar-fill" style="width:${s.score}%;background:${barColor};"></div></div>
+        </td>
+        <td style="color:var(--muted);font-weight:600;">${s.target}%</td>
+        <td style="font-weight:700;color:${gap > 0 ? 'var(--danger)' : 'var(--success)'};">${gap > 0 ? '-' + gap : '0'} pts</td>
+        <td><span class="score-pill ${pillClass}">${statusIcon}</span></td>
+      </tr>`;
+  }).join("");
+}
+
+// ─────────────────────────────────────────────
+// RENDER AI RECOMMENDATIONS (with WhatsApp Alert)
+// ─────────────────────────────────────────────
+function renderRecs() {
+  const container = document.getElementById("rec-container");
+  const badge = document.getElementById("rec-count-badge");
+  const lowSkills = SKILLS.filter(s => s.score < 70);
+
+  const lowCount = lowSkills.length;
+  syncSidebarBadge(lowCount);
+  const txt = lowCount + " item" + (lowCount !== 1 ? "s" : "");
+  const recBg  = lowCount > 0 ? "#fee2e2" : "#d1fae5";
+  const recClr = lowCount > 0 ? "#991b1b" : "#065f46";
+  syncOvRecBadge(txt, recBg, recClr);
+
+  if (lowCount === 0) {
+    container.innerHTML = `<div class="no-rec"><span>🎉</span>All skills are above 70% threshold.<br>No interventions required right now.</div>`;
+    badge.textContent = "0 items";
+    badge.style.background = "#d1fae5"; badge.style.color = "#065f46";
+    return;
+  }
+
+  badge.textContent = lowCount + " item" + (lowCount > 1 ? "s" : "");
+  badge.style.background = "#fee2e2"; badge.style.color = "#991b1b";
+
+  const sorted = [...lowSkills].sort((a, b) => a.score - b.score);
+  container.innerHTML = sorted.map(s => {
+    const urgency = s.score < 50 ? "danger" : "";
+    const urgencyLabel = s.score < 50 ? "🔴 Critical" : "🟡 Needs Attention";
+    const gap = s.target - s.score;
+    // Feature 3: WhatsApp pre-filled message
+    const waMsg = encodeURIComponent(
+      `🚨 *TVET Alert — Amirah Mahsuri (Cohort 2026-B)*\n` +
+      `Skill: *${s.label}*\n` +
+      `Current Score: *${s.score}%* | Target: *${s.target}%* | Gap: *−${gap} pts*\n` +
+      `Status: ${urgencyLabel}\n\n` +
+      `Recommended Activity:\n${s.activity}\n\n` +
+      `Resource: ${s.resource}`
+    );
+    const waUrl = `https://wa.me/?text=${waMsg}`;
+    return `
+      <div class="rec-item ${urgency}">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span class="rec-category">${s.label}</span>
+          <span style="font-size:11px;font-weight:700;">${urgencyLabel}</span>
+        </div>
+        <div class="rec-activity">📚 ${s.activity}</div>
+        <div class="rec-desc">
+          Current score: <strong>${s.score}%</strong> · Target: <strong>${s.target}%</strong> · Gap: <strong style="color:var(--danger);">−${gap} pts</strong>
+        </div>
+        <div class="rec-footer">
+          <a class="learn-more" href="${s.resource}" target="_blank" rel="noopener">
+            🔗 Learn More → ${s.resourceLabel}
+          </a>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <a href="${waUrl}" target="_blank" rel="noopener" class="btn btn-sm btn-warn" style="text-decoration:none;">
+              📲 WhatsApp Alert
+            </a>
+            <button class="btn btn-success btn-sm" onclick="markStarted('${s.id}')">▶ Start Activity</button>
+          </div>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+// ─────────────────────────────────────────────
+// RENDER METRICS
+// ─────────────────────────────────────────────
+function renderMetrics() {
+  const scores = SKILLS.map(s => s.score);
+  const overall = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+
+  document.getElementById("val-overall").textContent = overall + "%";
+  document.getElementById("bar-overall").style.width = overall + "%";
+
+  const gaps = SKILLS.map(s => Math.max(0, s.target - s.score));
+  const totalGap = gaps.reduce((a, b) => a + b, 0);
+  const avgGap = Math.round(totalGap / SKILLS.length);
+  const skillsOk = SKILLS.filter(s => s.score >= s.target).length;
+  const skillsBelow = SKILLS.filter(s => s.score < 70).length;
+
+  document.getElementById("gap-score").textContent = avgGap;
+  document.getElementById("bar-gap").style.width = Math.min(avgGap, 100) + "%";
+  document.getElementById("bar-gap").style.background = avgGap > 20 ? "var(--danger)" : "var(--warn)";
+  document.getElementById("skills-ok").textContent = skillsOk + " / " + SKILLS.length;
+  document.getElementById("skills-below").textContent = skillsBelow;
+  document.getElementById("avg-gap").textContent = avgGap + " pts";
+
+  const weeksEst = avgGap > 0 ? Math.ceil(totalGap / (14.5 * 1.8)) : 0;
+  document.getElementById("est-weeks").textContent = avgGap === 0 ? "0" : weeksEst;
+
+  // Sync overview panel gap card
+  const ovGap = document.getElementById("gap-score-ov");
+  const ovBar = document.getElementById("bar-gap-ov");
+  const ovWeeks = document.getElementById("est-weeks-ov");
+  if (ovGap) ovGap.textContent = avgGap;
+  if (ovBar) { ovBar.style.width = Math.min(avgGap, 100) + "%"; ovBar.style.background = avgGap > 20 ? "var(--danger)" : "var(--warn)"; }
+  if (ovWeeks) ovWeeks.textContent = avgGap === 0 ? "0" : weeksEst;
+}
+
+// ─────────────────────────────────────────────
+// RADAR CHART
+// ─────────────────────────────────────────────
+let radarChart = null;
+function renderRadar() {
+  const labels = SKILLS.map(s => s.label);
+  const current = SKILLS.map(s => s.score);
+  const target  = SKILLS.map(s => s.target);
+
+  if (radarChart) {
+    radarChart.data.datasets[0].data = current;
+    radarChart.data.datasets[1].data = target;
+    radarChart.update();
+    return;
+  }
+
+  const ctx = document.getElementById("radarChart").getContext("2d");
+  radarChart = new Chart(ctx, {
+    type: "radar",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "Current",
+          data: current,
+          borderColor: "#3b82f6",
+          backgroundColor: "rgba(59,130,246,0.15)",
+          borderWidth: 2,
+          pointBackgroundColor: "#3b82f6",
+          pointRadius: 4
+        },
+        {
+          label: "Target",
+          data: target,
+          borderColor: "#7c3aed",
+          backgroundColor: "rgba(124,58,237,0.08)",
+          borderWidth: 2,
+          borderDash: [6, 3],
+          pointBackgroundColor: "#7c3aed",
+          pointRadius: 4
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        r: {
+          min: 0, max: 100,
+          ticks: {
+            stepSize: 20,
+            font: { size: 10 },
+            color: "#718096",
+            backdropColor: "transparent"
+          },
+          grid: { color: "#e2e8f0" },
+          angleLines: { color: "#e2e8f0" },
+          pointLabels: { font: { size: 11, weight: "600" }, color: "#1a202c" }
+        }
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────
+// ACTIONS
+// ─────────────────────────────────────────────
+function applyScores() {
+  renderTable();
+  renderRecs();
+  renderMetrics();
+  renderRadar();
+  saveToStorage();
+  // New AI features
+  renderNarrative();
+  renderCertReadiness();
+  renderWeekPlan();
+  checkBadges();
+  showToast("✓ Analysis updated & saved");
+}
+
+function resetScores() {
+  SKILLS.forEach((s, i) => {
+    s.score = DEFAULT_SCORES[i];
+    const el = document.getElementById("inp-" + s.id);
+    const valEl = document.getElementById("val-" + s.id);
+    if (el) { el.value = DEFAULT_SCORES[i]; }
+    if (valEl) { valEl.textContent = DEFAULT_SCORES[i] + "%"; }
+  });
+  applyScores();
+  showToast("↺ Scores reset to defaults");
+}
+
+function markStarted(id) {
+  showToast("▶ Activity started for " + SKILLS.find(s => s.id === id)?.label);
+}
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 3000);
+}
+
+// ─────────────────────────────────────────────
+// FEATURE 4 — Print / Export PDF
+// ─────────────────────────────────────────────
+function exportPDF() {
+  document.getElementById("print-date").textContent = new Date().toLocaleDateString("en-MY", {
+    year: "numeric", month: "long", day: "numeric"
+  });
+  window.print();
+}
+
+// ─────────────────────────────────────────────
+// FEATURE 5 — QR Code Modal
+// ─────────────────────────────────────────────
+let qrGenerated = false;
+
+function openQR() {
+  const modal = document.getElementById("qr-modal");
+  modal.classList.add("open");
+  if (!qrGenerated) {
+    const url = window.location.href;
+    document.getElementById("qr-url").textContent = url;
+    const container = document.getElementById("qr-container");
+    container.innerHTML = "";
+    new QRCode(container, {
+      text: url,
+      width: 200,
+      height: 200,
+      colorDark: "#1a202c",
+      colorLight: "#ffffff",
+      correctLevel: QRCode.CorrectLevel.M
+    });
+    qrGenerated = true;
+  }
+}
+
+function closeQR() {
+  document.getElementById("qr-modal").classList.remove("open");
+}
+
+document.getElementById("qr-modal").addEventListener("click", function(e) {
+  if (e.target === this) closeQR();
+});
+
+// ─────────────────────────────────────────────
+// FEATURE 1 — AI Progress Narrative
+// ─────────────────────────────────────────────
+function renderNarrative() {
+  const scores = SKILLS.map(s => s.score);
+  const overall = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+  const best = [...SKILLS].sort((a, b) => b.score - a.score)[0];
+  const worst = [...SKILLS].sort((a, b) => (a.score - a.target) - (b.score - b.target))[0];
+  const gaps = SKILLS.map(s => Math.max(0, s.target - s.score));
+  const totalGap = gaps.reduce((a, b) => a + b, 0);
+  const weeksEst = totalGap > 0 ? Math.ceil(totalGap / (14.5 * 1.8)) : 0;
+  const skillsBelow = SKILLS.filter(s => s.score < 70).length;
+
+  let mood = overall >= 75 ? "strong" : overall >= 55 ? "moderate" : "needs significant attention";
+  let sentence1 = `Amirah's overall performance is <strong>${overall}%</strong> — ${mood}.`;
+  let sentence2 = `Strongest area: <strong>${best.label}</strong> (${best.score}%).`;
+  let sentence3 = worst.score < worst.target
+    ? `Biggest gap: <strong>${worst.label}</strong> — ${worst.target - worst.score} pts below target.`
+    : `All skills are meeting or exceeding their targets. 🎉`;
+  let sentence4 = skillsBelow > 0
+    ? `${skillsBelow} skill${skillsBelow > 1 ? "s" : ""} need${skillsBelow === 1 ? "s" : ""} intervention. Estimated certification readiness in <strong>${weeksEst} week${weeksEst !== 1 ? "s" : ""}</strong> at current pace.`
+    : `All skills are above the 70% threshold — no immediate interventions required.`;
+
+  document.getElementById("ai-narrative").innerHTML = `${sentence1} ${sentence2} ${sentence3} ${sentence4}`;
+}
+
+// ─────────────────────────────────────────────
+// FEATURE 3 — Certification Readiness Score
+// ─────────────────────────────────────────────
+const CERT_WEIGHTS = {
+  comptia: { knowledge: 0.40, problem_solving: 0.30, practical: 0.20, communication: 0.10 },
+  skm:     { practical: 0.40, safety: 0.30, problem_solving: 0.20, affective: 0.10 },
+  iev:     { safety: 0.40, practical: 0.35, knowledge: 0.15, affective: 0.10 }
+};
+
+function calcCertReadiness(weights) {
+  let score = 0;
+  for (const [id, w] of Object.entries(weights)) {
+    const skill = SKILLS.find(s => s.id === id);
+    if (skill) score += skill.score * w;
+  }
+  return Math.round(score);
+}
+
+function renderCertReadiness() {
+  const certs = [
+    { key: "comptia", fillId: "cr-comptia", pctId: "cr-comptia-pct", bigId: "cert-comptia-big" },
+    { key: "skm",     fillId: "cr-skm",     pctId: "cr-skm-pct",     bigId: "cert-skm-big"     },
+    { key: "iev",     fillId: "cr-iev",     pctId: "cr-iev-pct",     bigId: "cert-iev-big"     }
+  ];
+  certs.forEach(c => {
+    const pct = calcCertReadiness(CERT_WEIGHTS[c.key]);
+    // All instances of fill bars (may appear in multiple panels)
+    document.querySelectorAll("#" + c.fillId).forEach(el => { el.style.width = pct + "%"; });
+    document.querySelectorAll("#" + c.pctId).forEach(el => { el.textContent = pct + "%"; });
+    const bigEl = document.getElementById(c.bigId);
+    if (bigEl) bigEl.textContent = pct + "%";
+  });
+}
+
+// ─────────────────────────────────────────────
+// FEATURE 5 — AI Weekly Study Plan
+// ─────────────────────────────────────────────
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+const TOTAL_WEEKLY_HRS = 14.5;
+
+function renderWeekPlan() {
+  const container = document.getElementById("week-plan-container");
+  const skillsWithGap = SKILLS.map(s => ({ ...s, gap: Math.max(0, s.target - s.score) }))
+    .filter(s => s.gap > 0)
+    .sort((a, b) => b.gap - a.gap);
+
+  if (skillsWithGap.length === 0) {
+    container.innerHTML = `<div class="no-rec" style="padding:16px;"><span>🎉</span>All targets met — enjoy a review week!</div>`;
+    return;
+  }
+
+  const totalGap = skillsWithGap.reduce((a, s) => a + s.gap, 0);
+  // Assign hours proportionally to gap; allocate across 5 days
+  const allocations = skillsWithGap.map(s => ({
+    label: s.label,
+    hours: Math.round((s.gap / totalGap) * TOTAL_WEEKLY_HRS * 10) / 10,
+    activity: s.activity,
+    urgency: s.gap >= 20 ? "🔴" : "🟡"
+  }));
+
+  // Spread allocations across Mon–Fri by round-robin
+  const plan = DAYS.map(d => ({ day: d, items: [] }));
+  allocations.forEach((a, i) => {
+    plan[i % DAYS.length].items.push(a);
+  });
+  // Put remaining slots' hours on the first day's items
+  for (let i = DAYS.length; i < allocations.length; i++) {
+    plan[i % DAYS.length].items.push(allocations[i]);
+  }
+
+  const rows = plan.map(p => {
+    if (p.items.length === 0) return `<tr><td style="font-weight:600;">${p.day}</td><td colspan="3" style="color:var(--muted);">Rest / Self-revision</td></tr>`;
+    return p.items.map((item, idx) => `
+      <tr>
+        ${idx === 0 ? `<td style="font-weight:600;vertical-align:top;" rowspan="${p.items.length}">${p.day}</td>` : ""}
+        <td>${item.urgency} ${item.label}</td>
+        <td style="color:var(--muted);">${item.hours} hrs</td>
+        <td style="font-size:11px;color:var(--muted);">${item.activity.split(".")[0]}.</td>
+      </tr>`).join("");
+  }).join("");
+
+  container.innerHTML = `
+    <table class="week-plan-table">
+      <thead><tr><th>Day</th><th>Focus Area</th><th>Hours</th><th>Activity (summary)</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+// ─────────────────────────────────────────────
+// FEATURE 6 — Gamification: Badges & Milestones
+// ─────────────────────────────────────────────
+const BADGE_DEFS = [
+  { id: "first_skill",   icon: "🏆", label: "First Skill Mastered",  condition: s => s.some(x => x.score >= x.target) },
+  { id: "halfway",       icon: "🌟", label: "Half Way There (50%+)", condition: s => avg(s) >= 50 },
+  { id: "almost_cert",   icon: "🎯", label: "Almost Certified (75%+)", condition: s => avg(s) >= 75 },
+  { id: "zero_gap",      icon: "🏅", label: "Zero Gap Champion",     condition: s => s.every(x => x.score >= x.target) },
+  { id: "consistent",    icon: "🔥", label: "Consistent Learner",    condition: s => s.filter(x => x.score >= 70).length >= 4 }
+];
+
+function avg(skills) { return Math.round(skills.reduce((a, s) => a + s.score, 0) / skills.length); }
+
+function loadBadges() {
+  try { return JSON.parse(localStorage.getItem(LS_BADGE_KEY) || "[]"); } catch(e) { return []; }
+}
+function saveBadges(badges) {
+  try { localStorage.setItem(LS_BADGE_KEY, JSON.stringify(badges)); } catch(e) {}
+}
+
+function checkBadges() {
+  const earned = loadBadges();
+  const newBadges = [];
+  for (const def of BADGE_DEFS) {
+    if (!earned.includes(def.id) && def.condition(SKILLS)) {
+      earned.push(def.id);
+      newBadges.push(def);
+    }
+  }
+  if (newBadges.length > 0) {
+    saveBadges(earned);
+    newBadges.forEach(b => {
+      setTimeout(() => showToast(`${b.icon} Badge unlocked: ${b.label}!`), 600);
+    });
+  }
+  renderBadges(earned);
+}
+
+function renderBadges(earned) {
+  const section = document.getElementById("badges-section");
+  const chips = document.getElementById("badges-chips");
+  if (!earned || earned.length === 0) { section.style.display = "none"; return; }
+  section.style.display = "";
+  chips.innerHTML = earned.map(id => {
+    const def = BADGE_DEFS.find(d => d.id === id);
+    return def ? `<span class="chip-badge">${def.icon} ${def.label}</span>` : "";
+  }).join("");
+}
+
+// ─────────────────────────────────────────────
+// FEATURE 4 — Gemini AI Chatbot
+// ─────────────────────────────────────────────
+const FAQ_BANK = [
+  { q: "What is this dashboard?", a: "This is the TVET Personalized Learning Dashboard — it tracks student performance across 6 skill domains and generates AI-driven recommendations to close learning gaps." },
+  { q: "What are the 6 skill domains?", a: "The 6 domains are: Knowledge, Practical Skill, Affective, Problem Solving, Safety Practices, and Communication — all aligned to TVET competency frameworks." },
+  { q: "How is the overall progress calculated?", a: "Overall progress is the simple average of all 6 skill domain scores." },
+  { q: "What does the skill gap score mean?", a: "The Skill Gap Score is the average number of points each skill falls below its target. Lower is better!" },
+  { q: "When does a skill trigger a recommendation?", a: "Any skill scoring below 70% triggers an AI recommendation. Below 50% = 🔴 Critical; 50–69% = 🟡 Needs Attention." },
+  { q: "How do I update scores?", a: "Use the Performance Input card (Lecturer View) — drag the sliders and click ✓ Apply & Analyse." },
+  { q: "What is the WhatsApp Alert button?", a: "It opens WhatsApp with a pre-filled message containing the student's name, skill, score, gap, and recommended activity." },
+  { q: "How do I export an official PDF?", a: "Click '🖨 Export PDF' in the navbar. Select 'Save as PDF' in your browser's print dialog." },
+  { q: "What is the radar chart?", a: "The radar chart compares current skill scores (blue) against target proficiency levels (purple) across all 6 domains." },
+  { q: "What are the certifications?", a: "Target certs: CompTIA ITF+ (IT fundamentals), SKM Level 3 (Malaysian national skills), IEV Wiring (internal electrical wiring)." }
+];
+
+function saveGeminiKey(val) {
+  try { localStorage.setItem(LS_GEMINI_KEY, val.trim()); } catch(e) {}
+}
+
+function getGeminiKey() {
+  try { return localStorage.getItem(LS_GEMINI_KEY) || ""; } catch(e) { return ""; }
+}
+
+function buildSystemContext() {
+  const scores = SKILLS.map(s => `${s.label}: ${s.score}% (target ${s.target}%)`).join(", ");
+  const overall = Math.round(SKILLS.reduce((a, s) => a + s.score, 0) / SKILLS.length);
+  const gaps = SKILLS.filter(s => s.score < s.target).map(s => `${s.label} (gap: ${s.target - s.score} pts)`).join(", ");
+  return `You are an AI learning assistant for the TVET Personalized Learning Dashboard. The student is Amirah Mahsuri, Cohort 2026-B, studying Electrical Engineering. Current skill scores: ${scores}. Overall average: ${overall}%. Skills below target: ${gaps || "none"}. Answer in a helpful, concise, encouraging tone. Keep responses under 120 words.`;
+}
+
+function localFallback(q) {
+  const qLower = q.toLowerCase();
+  let best = null, bestScore = 0;
+  for (const item of FAQ_BANK) {
+    const combined = (item.q + " " + item.a).toLowerCase();
+    const words = qLower.split(/\s+/).filter(w => w.length > 2);
+    let score = 0;
+    for (const w of words) { if (combined.includes(w)) score++; }
+    if (score > bestScore) { bestScore = score; best = item; }
+  }
+  if (best && bestScore > 0) return best.a;
+  return "I couldn't find a specific answer. Try asking about skill gaps, certification readiness, study plans, WhatsApp alerts, or PDF export. Or add a Gemini API key below for full AI responses!";
+}
+
+function buildFAQChips() {
+  const chipRow = document.getElementById("faq-chips");
+  const topics = [
+    "What is my strongest skill?",
+    "How do I improve Knowledge?",
+    "When will I be cert-ready?",
+    "What is the SKM cert?",
+    "Export PDF",
+    "Student vs Lecturer View"
+  ];
+  chipRow.innerHTML = topics.map(t => `<button class="faq-chip" onclick="askFAQ('${t.replace(/'/g,"\\'")}')">💡 ${t}</button>`).join("");
+}
+
+function toggleFAQ() {
+  const panel = document.getElementById("faq-panel");
+  panel.classList.toggle("open");
+}
+
+function sendFAQ() {
+  const input = document.getElementById("faq-input");
+  const q = input.value.trim();
+  if (!q) return;
+  input.value = "";
+  askFAQ(q);
+}
+
+function askFAQ(question) {
+  appendFAQMsg(question, "user");
+  const key = getGeminiKey();
+  if (key) {
+    callGemini(question, key);
+  } else {
+    const answer = localFallback(question);
+    setTimeout(() => appendFAQMsg(answer, "bot"), 320);
+  }
+}
+
+function appendFAQMsg(text, role, isHTML) {
+  const messages = document.getElementById("faq-messages");
+  const div = document.createElement("div");
+  div.className = "faq-msg " + role;
+  if (isHTML) div.innerHTML = text; else div.textContent = text;
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+  return div;
+}
+
+async function callGemini(question, apiKey) {
+  // Show typing indicator
+  const messages = document.getElementById("faq-messages");
+  const typingDiv = document.createElement("div");
+  typingDiv.className = "faq-msg bot";
+  typingDiv.innerHTML = `<div class="faq-typing"><span></span><span></span><span></span></div>`;
+  messages.appendChild(typingDiv);
+  messages.scrollTop = messages.scrollHeight;
+
+  try {
+    const systemCtx = buildSystemContext();
+    const payload = {
+      contents: [
+        { role: "user", parts: [{ text: systemCtx + "\n\nUser question: " + question }] }
+      ]
+    };
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }
+    );
+    const data = await resp.json();
+    typingDiv.remove();
+    if (data.candidates && data.candidates[0]) {
+      const text = data.candidates[0].content.parts[0].text;
+      appendFAQMsg(text, "bot");
+    } else if (data.error) {
+      appendFAQMsg("⚠️ Gemini error: " + (data.error.message || "Unknown error. Check your API key."), "bot");
+    } else {
+      appendFAQMsg(localFallback(question), "bot");
+    }
+  } catch(err) {
+    typingDiv.remove();
+    appendFAQMsg("⚠️ Could not reach Gemini API. Check your internet connection. Falling back to local answers.", "bot");
+    appendFAQMsg(localFallback(question), "bot");
+  }
+}
+
+// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// SIDEBAR NAVIGATION
+// ─────────────────────────────────────────────
+let sidebarCollapsed = false;
+
+function toggleSidebar() {
+  sidebarCollapsed = !sidebarCollapsed;
+  document.getElementById("sidebar").classList.toggle("collapsed", sidebarCollapsed);
+}
+
+function toggleMobileSidebar() {
+  document.getElementById("sidebar").classList.toggle("mobile-open");
+  document.getElementById("sidebar-overlay").classList.toggle("open");
+}
+
+function closeMobileSidebar() {
+  document.getElementById("sidebar").classList.remove("mobile-open");
+  document.getElementById("sidebar-overlay").classList.remove("open");
+}
+
+function navTo(panelId, clickedEl) {
+  // Hide all panels
+  document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+  // Show target panel
+  const target = document.getElementById(panelId);
+  if (target) target.classList.add("active");
+
+  // Update sidebar active state
+  document.querySelectorAll(".nav-item[data-panel]").forEach(item => {
+    item.classList.toggle("active", item.dataset.panel === panelId);
+  });
+
+  // If no element passed, find from data-panel
+  if (!clickedEl) {
+    const matching = document.querySelector(`.nav-item[data-panel="${panelId}"]`);
+    if (matching) matching.classList.add("active");
+  }
+
+  // Close mobile sidebar on nav
+  closeMobileSidebar();
+
+  // Scroll main content to top
+  const mc = document.getElementById("main-content");
+  if (mc) mc.scrollTop = 0;
+
+  // Re-render radar if navigating to scores panel (canvas needs repaint)
+  if (panelId === "panel-scores" && radarChart) {
+    setTimeout(() => radarChart.resize(), 50);
+  }
+
+  // Panel activation hooks
+  if (panelId === "panel-profiler")     renderProfiler();
+  if (panelId === "panel-forecast")     renderForecast();
+  if (panelId === "panel-warning")      renderWarning();
+  if (panelId === "panel-goals")        renderGoals();
+  if (panelId === "panel-quiz")         { if (!quizState.questions) initQuiz(); }
+  if (panelId === "panel-reportcard")   generateReportCard();
+  if (panelId === "panel-learningpath") generateLearningPath();
+  if (panelId === "panel-feedback")     generateFeedback();
+  if (panelId === "panel-exam")         { if (!examState.questions) initExam(); }
+  if (panelId === "panel-lab")          { if (!labState.faultId) initLab(); }
+  if (panelId === "panel-whatif")       initWhatif();
+  if (panelId === "panel-challenge")    { if (!challengeState.questions) initChallenge(); }
+}
+
+// Sync rec badge in sidebar
+function syncSidebarBadge(count) {
+  const badge = document.getElementById("sidebar-rec-badge");
+  if (!badge) return;
+  if (count > 0) {
+    badge.textContent = count;
+    badge.style.display = "";
+  } else {
+    badge.style.display = "none";
+  }
+}
+
+// Also sync overview rec badge
+function syncOvRecBadge(text, bg, color) {
+  const b = document.getElementById("ov-rec-badge");
+  if (b) { b.textContent = text; b.style.background = bg; b.style.color = color; }
+}
+
+
+// Build second slider set for panel-input
+function buildInputs2() {
+  const container = document.getElementById("score-inputs-2");
+  if (!container) return;
+  container.innerHTML = SKILLS.map(s => `
+    <div class="form-group">
+      <label for="inp2-${s.id}">${s.label}</label>
+      <div class="range-row">
+        <input type="range" id="inp2-${s.id}" min="0" max="100" value="${s.score}"
+          oninput="document.getElementById('val2-${s.id}').textContent = this.value + '%'; SKILLS.find(x=>x.id==='${s.id}').score = +this.value; syncSlidersFromId('${s.id}', +this.value);" />
+        <span class="range-val" id="val2-${s.id}">${s.score}%</span>
+      </div>
+    </div>
+  `).join("");
+}
+
+// Keep both slider sets in sync
+function syncSlidersFromId(id, val) {
+  ["inp-", "inp2-"].forEach(prefix => {
+    const el = document.getElementById(prefix + id);
+    const valEl = document.getElementById(prefix.replace("inp","val") + id);
+    if (el && +el.value !== val) el.value = val;
+    if (valEl) valEl.textContent = val + "%";
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// AI FUNCTIONS
+// ═══════════════════════════════════════════════════════
+
+// ── 1. SKILL PROFILER ──
+function getMasteryLevel(score) {
+  if (score >= 85) return { label:"Expert",      cls:"mastery-expert" };
+  if (score >= 70) return { label:"Proficient",  cls:"mastery-proficient" };
+  if (score >= 50) return { label:"Developing",  cls:"mastery-developing" };
+  return               { label:"Beginner",    cls:"mastery-beginner" };
+}
+
+function renderProfiler() {
+  const list = document.getElementById("profiler-list");
+  const summary = document.getElementById("profiler-summary");
+  if (!list) return;
+  list.innerHTML = SKILLS.map(s => {
+    const m = getMasteryLevel(s.score);
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);">
+      <div>
+        <div style="font-size:13px;font-weight:600;">${s.label}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">${s.score}% — target ${s.target}%</div>
+      </div>
+      <span class="mastery-pill ${m.cls}">${m.label}</span>
+    </div>`;
+  }).join("");
+  const counts = { Expert:0, Proficient:0, Developing:0, Beginner:0 };
+  SKILLS.forEach(s => counts[getMasteryLevel(s.score).label]++);
+  const overall = avg(SKILLS);
+  const topSkill = [...SKILLS].sort((a,b) => b.score - a.score)[0];
+  const weakSkill = [...SKILLS].sort((a,b) => a.score - b.score)[0];
+  summary.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+      ${Object.entries(counts).map(([k,v]) => `
+        <div style="background:#f7f8fa;border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;">
+          <div style="font-size:22px;font-weight:800;">${v}</div>
+          <div style="font-size:11px;color:var(--muted);font-weight:600;">${k}</div>
+        </div>`).join("")}
+    </div>
+    <div style="font-size:12px;line-height:1.8;color:var(--muted);">
+      <div>📊 Overall average: <strong style="color:var(--text);">${overall}%</strong></div>
+      <div>🌟 Strongest: <strong style="color:var(--success);">${topSkill.label} (${topSkill.score}%)</strong></div>
+      <div>⚠️ Weakest: <strong style="color:var(--danger);">${weakSkill.label} (${weakSkill.score}%)</strong></div>
+    </div>`;
+}
+
+// ── 2. PROGRESS FORECASTER ──
+function renderForecast() {
+  const el = document.getElementById("forecast-bars");
+  if (!el) return;
+  const RATE = 1.8, HRS = 14.5, WEEKS = 12;
+  const gain = RATE * HRS * WEEKS;
+  el.innerHTML = SKILLS.map(s => {
+    const projected = Math.min(100, Math.round(s.score + gain * (s.score < s.target ? 1 : 0.2)));
+    const color = s.score >= s.target ? "var(--success)" : "var(--accent)";
+    return `<div class="forecast-bar-row">
+      <div class="forecast-bar-label">${s.label}</div>
+      <div class="forecast-bar-track" style="height:12px;">
+        <div class="forecast-bar-proj" style="width:${projected}%;background:${color};border-radius:5px;"></div>
+        <div class="forecast-bar-now"  style="width:${s.score}%;background:${color};border-radius:5px;opacity:1;"></div>
+      </div>
+      <div class="forecast-bar-pcts">${s.score}% → <strong style="color:${color}">${projected}%</strong></div>
+    </div>`;
+  }).join("");
+}
+
+// ── 3. EARLY WARNING DETECTOR ──
+function renderWarning() {
+  const factorsEl = document.getElementById("warning-factors");
+  const overallEl = document.getElementById("warning-overall");
+  if (!factorsEl) return;
+  const skillsBelow70 = SKILLS.filter(s => s.score < 70).length;
+  const skillsBelow50 = SKILLS.filter(s => s.score < 50).length;
+  const overall = avg(SKILLS);
+  const totalGap = SKILLS.reduce((a,s) => a + Math.max(0, s.target - s.score), 0);
+  const factors = [
+    { label:"Skills below 70%",     value:`${skillsBelow70} of ${SKILLS.length}`, risk: skillsBelow70 >= 3 ? "high" : skillsBelow70 >= 1 ? "medium" : "low" },
+    { label:"Critical skills (<50%)", value:`${skillsBelow50} of ${SKILLS.length}`, risk: skillsBelow50 >= 2 ? "high" : skillsBelow50 === 1 ? "medium" : "low" },
+    { label:"Overall average",       value:`${overall}%`,    risk: overall < 55 ? "high" : overall < 70 ? "medium" : "low" },
+    { label:"Total gap points",      value:`${totalGap} pts`, risk: totalGap > 80 ? "high" : totalGap > 40 ? "medium" : "low" },
+  ];
+  factorsEl.innerHTML = factors.map(f => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);">
+      <div style="font-size:13px;font-weight:600;">${f.label}</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:12px;color:var(--muted);">${f.value}</span>
+        <span class="risk-badge risk-${f.risk}">${f.risk==="high"?"🔴":f.risk==="medium"?"🟡":"🟢"} ${f.risk}</span>
+      </div>
+    </div>`).join("");
+  const highCount = factors.filter(f => f.risk === "high").length;
+  const medCount  = factors.filter(f => f.risk === "medium").length;
+  const riskLevel = highCount >= 2 ? "HIGH" : highCount === 1 || medCount >= 2 ? "MEDIUM" : "LOW";
+  const riskColor = riskLevel === "HIGH" ? "var(--danger)" : riskLevel === "MEDIUM" ? "var(--warn)" : "var(--success)";
+  const riskEmoji = riskLevel === "HIGH" ? "🚨" : riskLevel === "MEDIUM" ? "⚠️" : "✅";
+  overallEl.innerHTML = `
+    <div style="font-size:52px;">${riskEmoji}</div>
+    <div style="font-size:24px;font-weight:800;color:${riskColor};margin-top:8px;">${riskLevel} RISK</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:8px;max-width:200px;margin-left:auto;margin-right:auto;">
+      ${riskLevel==="HIGH"?"Immediate intervention recommended. Contact the student.":riskLevel==="MEDIUM"?"Monitor closely. Schedule a check-in session.":"Student is on track. Continue current support."}
+    </div>`;
+}
+
+// ── 4. SMART GOAL PLANNER ──
+let goalStates = {};
+function renderGoals() {
+  const el = document.getElementById("goals-list");
+  const badge = document.getElementById("goals-complete-badge");
+  if (!el) return;
+  const goals = SKILLS.filter(s => s.score < s.target).map(s => {
+    const gap = s.target - s.score;
+    const weeks = Math.ceil(gap / (14.5 * 1.8 / SKILLS.length));
+    const deadline = new Date(); deadline.setDate(deadline.getDate() + weeks * 7);
+    const dStr = deadline.toLocaleDateString("en-MY", { day:"numeric", month:"short", year:"numeric" });
+    return { id:s.id, label:s.label, current:s.score, target:s.target, gap, weeks, deadline:dStr };
+  });
+  if (goals.length === 0) {
+    el.innerHTML = `<div class="no-rec"><span>🎉</span>All skill targets are already met — no active goals needed!</div>`;
+    badge.textContent = "0 / 0 complete"; return;
+  }
+  const done = goals.filter(g => goalStates[g.id]).length;
+  badge.textContent = `${done} / ${goals.length} complete`;
+  el.innerHTML = goals.map(g => `
+    <div class="goal-row">
+      <div class="goal-check ${goalStates[g.id]?"done":""}" onclick="toggleGoal('${g.id}')">${goalStates[g.id]?"✓":""}</div>
+      <div class="goal-info">
+        <div class="goal-title" style="${goalStates[g.id]?"text-decoration:line-through;opacity:.5;":""}">${g.label}: reach ${g.target}%</div>
+        <div class="goal-deadline">📅 Target by ${g.deadline} · est. ${g.weeks} wk${g.weeks!==1?"s":""}</div>
+      </div>
+      <div class="goal-progress" style="color:var(--danger);">−${g.gap} pts</div>
+    </div>`).join("");
+}
+function toggleGoal(id) { goalStates[id] = !goalStates[id]; renderGoals(); }
+
+// ═══════════════════════════════════════════════════════
+// AI GENERATOR
+// ═══════════════════════════════════════════════════════
+
+// ── 5. QUIZ GENERATOR ──
+const QUIZ_BANK = {
+  knowledge: [
+    { q:"What is Ohm's Law?", opts:["V = IR","P = IV","I = PV","R = PI"], ans:0 },
+    { q:"Which unit measures electrical resistance?", opts:["Ampere","Volt","Ohm","Watt"], ans:2 },
+    { q:"In a series circuit, current is:", opts:["Different in each component","The same throughout","Zero at the source","Divided equally"], ans:1 },
+    { q:"What does EMF stand for?", opts:["Electrical Main Force","Electromotive Force","Electronic Mass Factor","Electron Mobility Factor"], ans:1 },
+    { q:"A capacitor stores:", opts:["Magnetic energy","Mechanical energy","Electrical energy","Thermal energy"], ans:2 },
+  ],
+  practical: [
+    { q:"Which tool measures AC/DC voltage?", opts:["Oscilloscope","Multimeter","Ammeter","Galvanometer"], ans:1 },
+    { q:"Proper PPE for electrical work includes:", opts:["Rubber gloves only","Hard hat only","Insulated gloves, safety glasses, and non-conductive shoes","Regular shoes"], ans:2 },
+    { q:"Before wiring, you should always:", opts:["Test the circuit live","Isolate and lock-out the supply","Use bare hands","Assume it's safe"], ans:1 },
+    { q:"A blown fuse should be replaced with:", opts:["A higher-rated fuse","The same-rated fuse","A wire","Nothing"], ans:1 },
+    { q:"Wire colour for earth/ground in Malaysia:", opts:["Red","Black","Yellow/Green","Blue"], ans:2 },
+  ],
+  problem_solving: [
+    { q:"A lamp doesn't light. First step?", opts:["Replace the lamp","Check the power supply","Buy a new circuit","Ignore it"], ans:1 },
+    { q:"High resistance in a circuit causes:", opts:["Higher current","Lower current","No change","Short circuit"], ans:1 },
+    { q:"A circuit breaker trips repeatedly. This indicates:", opts:["Normal operation","Overload or short circuit","Wrong voltage","Good insulation"], ans:1 },
+    { q:"Voltage drop across a resistor increases when:", opts:["Current decreases","Resistance decreases","Current increases","Temperature drops"], ans:2 },
+    { q:"Which instrument detects earth leakage?", opts:["Ammeter","RCD / ELCB","Voltmeter","Wattmeter"], ans:1 },
+  ],
+  safety: [
+    { q:"Safe working voltage for DC is below:", opts:["12V","50V","110V","240V"], ans:1 },
+    { q:"What does RCD stand for?", opts:["Residual Current Device","Relay Control Device","Resistance Control Detector","None"], ans:0 },
+    { q:"LOCKOUT/TAGOUT prevents:", opts:["Corrosion","Accidental energisation","Over-voltage","Under-current"], ans:1 },
+    { q:"Electrical fires should be extinguished with:", opts:["Water","CO₂ extinguisher","Foam","Sand"], ans:1 },
+    { q:"The danger zone near high-voltage lines is:", opts:["0.5m","1m","3m","10m"], ans:2 },
+  ],
+  affective: [
+    { q:"A colleague skips a safety check. You should:", opts:["Ignore it","Report/remind them professionally","Do it for them silently","Leave the site"], ans:1 },
+    { q:"Punctuality in the workplace reflects:", opts:["Luck","Professionalism and responsibility","Personal preference","Nothing"], ans:1 },
+    { q:"Receiving critical feedback should make you:", opts:["Defensive","Reflect and improve","Ignore the person","Quit"], ans:1 },
+    { q:"A positive attitude towards challenges leads to:", opts:["More mistakes","Faster burnout","Better problem solving","Avoidance"], ans:2 },
+    { q:"Teamwork means:", opts:["Doing everything alone","Collaborating and supporting colleagues","Taking credit only","Competing internally"], ans:1 },
+  ],
+  communication: [
+    { q:"A technical briefing should be:", opts:["As long as possible","Clear, concise, and structured","Full of jargon","Informal only"], ans:1 },
+    { q:"When writing a report, you should:", opts:["Use passive voice always","Include all raw data","Be clear and accurate","Use slang"], ans:2 },
+    { q:"Active listening means:", opts:["Nodding without hearing","Focusing and asking clarifying questions","Planning your reply while others speak","Staying silent"], ans:1 },
+    { q:"A schematic diagram communicates:", opts:["Feelings","Circuit topology and connections","Marketing data","Safety ratings"], ans:1 },
+    { q:"The best way to explain a complex fault:", opts:["Use only verbal explanation","Show a diagram + verbal explanation","Write a long email","Guess"], ans:1 },
+  ],
+};
+
+let quizState = {};
+function initQuiz() {
+  const skill = [...SKILLS].sort((a,b) => (b.target-b.score)-(a.target-a.score))[0];
+  const bank = QUIZ_BANK[skill.id] || QUIZ_BANK.knowledge;
+  const questions = [...bank].sort(() => Math.random()-.5).slice(0,5);
+  quizState = { skill, questions, current:0, score:0, answered:false };
+  document.getElementById("quiz-skill-label").textContent = `Topic: ${skill.label}`;
+  document.getElementById("quiz-total").textContent = questions.length;
+  renderQuizQuestion();
+}
+function renderQuizQuestion() {
+  const { questions, current, score } = quizState;
+  const el = document.getElementById("quiz-content");
+  const pct = (current / questions.length) * 100;
+  document.getElementById("quiz-progress-fill").style.width = pct + "%";
+  document.getElementById("quiz-qnum").textContent = current + 1;
+  if (current >= questions.length) {
+    const pct2 = Math.round((score / questions.length) * 100);
+    const color = pct2 >= 80 ? "var(--success)" : pct2 >= 60 ? "var(--warn)" : "var(--danger)";
+    el.innerHTML = `<div class="quiz-result-screen">
+      <div class="quiz-score-big" style="color:${color};">${score}/${questions.length}</div>
+      <div class="quiz-score-label">${pct2}% — ${pct2>=80?"Excellent! 🎉":pct2>=60?"Good effort! Keep going.":"Keep practising — you'll get there!"}</div>
+      <button class="btn btn-primary" style="margin-top:20px;" onclick="initQuiz()">Try Another Quiz</button>
+    </div>`;
+    document.getElementById("quiz-progress-fill").style.width = "100%"; return;
+  }
+  const q = questions[current];
+  quizState.answered = false;
+  el.innerHTML = `<div class="quiz-question">Q${current+1}. ${q.q}</div>
+    <div class="quiz-options">
+      ${q.opts.map((o,i) => `<div class="quiz-option" onclick="answerQuiz(${i})" id="qopt-${i}">
+        <span class="opt-key">${String.fromCharCode(65+i)}</span>${o}
+      </div>`).join("")}
+    </div>`;
+}
+function answerQuiz(idx) {
+  if (quizState.answered) return;
+  quizState.answered = true;
+  const q = quizState.questions[quizState.current];
+  const isCorrect = idx === q.ans;
+  if (isCorrect) quizState.score++;
+  document.querySelectorAll(".quiz-option").forEach((el,i) => {
+    if (i === q.ans) el.classList.add("correct");
+    else if (i === idx && !isCorrect) el.classList.add("wrong");
+  });
+  setTimeout(() => { quizState.current++; renderQuizQuestion(); }, 1200);
+}
+
+// ── 6. REPORT CARD GENERATOR ──
+function gradeFromScore(score, target) {
+  const r = score / target;
+  if (r >= 1.1)  return { grade:"A+", color:"#065f46" };
+  if (r >= 1.0)  return { grade:"A",  color:"#065f46" };
+  if (r >= 0.9)  return { grade:"B",  color:"#1e40af" };
+  if (r >= 0.75) return { grade:"C",  color:"#92400e" };
+  if (r >= 0.6)  return { grade:"D",  color:"#c2410c" };
+  return                { grade:"F",  color:"#991b1b" };
+}
+function generateReportCard() {
+  const el = document.getElementById("report-card-content");
+  if (!el) return;
+  const overall = avg(SKILLS);
+  const og = gradeFromScore(overall, 75);
+  const date = new Date().toLocaleDateString("en-MY", { day:"numeric", month:"long", year:"numeric" });
+  const rows = SKILLS.map(s => {
+    const g = gradeFromScore(s.score, s.target);
+    const status = s.score >= s.target ? "✔ Met" : s.score >= 70 ? "⚠ Near" : "✗ Below";
+    return `<tr><td>${s.label}</td><td style="text-align:center;">${s.score}%</td><td style="text-align:center;">${s.target}%</td>
+      <td style="text-align:center;"><span class="rc-grade" style="color:${g.color};">${g.grade}</span></td>
+      <td style="text-align:center;">${status}</td></tr>`;
+  }).join("");
+  el.innerHTML = `
+    <div class="rc-header">
+      <div class="rc-title">TVET Learning Platform</div>
+      <div class="rc-subtitle">Student Progress Report Card</div>
+      <div style="margin-top:8px;display:flex;justify-content:space-between;font-size:11px;color:var(--muted);">
+        <span><strong>Student:</strong> Amirah Mahsuri</span>
+        <span><strong>Cohort:</strong> 2026-B</span>
+        <span><strong>Date:</strong> ${date}</span>
+      </div>
+    </div>
+    <table class="rc-table">
+      <thead><tr><th>Skill Domain</th><th>Score</th><th>Target</th><th>Grade</th><th>Status</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div style="margin-top:14px;display:flex;justify-content:space-between;align-items:center;padding-top:12px;border-top:1px solid var(--border);">
+      <div style="font-size:13px;font-weight:600;">Overall: <strong style="font-size:16px;color:${og.color};">${overall}% — Grade ${og.grade}</strong></div>
+      <span class="badge-pill" style="background:${overall>=75?"#d1fae5":"#fef3c7"};color:${og.color};">${overall>=75?"On Track":"Needs Improvement"}</span>
+    </div>`;
+}
+
+// ── 7. LEARNING PATH GENERATOR ──
+function generateLearningPath() {
+  const el = document.getElementById("lp-timeline");
+  const stats = document.getElementById("lp-stats");
+  if (!el) return;
+  const sorted = [...SKILLS].sort((a,b) => (b.target-b.score)-(a.target-a.score));
+  const totalWeeks = sorted.reduce((a,s) => a + Math.ceil(Math.max(0,s.target-s.score)/(14.5*1.8/SKILLS.length)), 0);
+  const moduleMap = {
+    knowledge:      { module:"Circuit Theory Fundamentals",    resource:"openlearn.edu" },
+    practical:      { module:"Wiring & Lab Practicum",         resource:"phet.colorado.edu" },
+    affective:      { module:"Workplace Safety & Soft Skills", resource:"osha.gov" },
+    problem_solving:{ module:"Fault Diagnosis Workshop",       resource:"khanacademy.org" },
+    safety:         { module:"Electrical Hazard Management",   resource:"hse.gov.uk" },
+    communication:  { module:"Technical Communication",        resource:"coursera.org" },
+  };
+  el.innerHTML = sorted.map((s,i) => {
+    const gap = Math.max(0, s.target - s.score);
+    const wks = Math.ceil(gap / (14.5 * 1.8 / SKILLS.length));
+    const m = moduleMap[s.id] || { module:s.label+" Module" };
+    const status = gap===0?"done":i===0?"active":"";
+    return `<div class="lp-step">
+      <div class="lp-dot ${status}">${gap===0?"✓":i+1}</div>
+      <div class="lp-step-title">${m.module}</div>
+      <div class="lp-step-sub">${s.label} · ${s.score}% → ${s.target}% · est. ${wks} wk${wks!==1?"s":""}</div>
+      <div class="lp-step-badge">
+        ${gap===0?'<span class="mastery-pill mastery-expert">Complete</span>':i===0?'<span class="mastery-pill mastery-developing">In Progress</span>':'<span class="mastery-pill mastery-beginner">Upcoming</span>'}
+      </div>
+    </div>`;
+  }).join("");
+  const done = sorted.filter(s => s.score >= s.target).length;
+  stats.innerHTML = `<div style="display:flex;flex-direction:column;gap:12px;">
+    <div style="display:flex;justify-content:space-between;font-size:13px;padding:8px 0;border-bottom:1px solid var(--border);">
+      <span style="font-weight:600;">Modules completed</span><span style="font-weight:700;color:var(--success);">${done} / ${SKILLS.length}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:13px;padding:8px 0;border-bottom:1px solid var(--border);">
+      <span style="font-weight:600;">Est. total duration</span><span style="font-weight:700;color:var(--accent);">${totalWeeks} weeks</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:13px;padding:8px 0;">
+      <span style="font-weight:600;">Current priority</span><span style="font-weight:700;color:var(--warn);">${moduleMap[sorted[0].id]?.module||sorted[0].label}</span>
+    </div>
+  </div>`;
+}
+
+// ── 8. FEEDBACK GENERATOR ──
+function generateFeedback() {
+  const el = document.getElementById("feedback-content");
+  const toneEl = document.getElementById("feedback-tone");
+  if (!el) return;
+  const tone = toneEl ? toneEl.value : "encouraging";
+  const overall = avg(SKILLS);
+  const best = [...SKILLS].sort((a,b) => b.score - a.score)[0];
+  const worst = [...SKILLS].sort((a,b) => (a.score-a.target)-(b.score-b.target))[0];
+  const skillsBelow = SKILLS.filter(s => s.score < 70);
+  const openings = {
+    encouraging:"Amirah, it's been a pleasure following your progress this term. Your dedication to learning is evident.",
+    formal:"This feedback is provided following a review of Amirah Mahsuri's (Cohort 2026-B) performance data for the current assessment period.",
+    direct:"Here is a direct assessment of Amirah's current performance. The goal is clarity so corrective action can be taken promptly.",
+  };
+  const closings = {
+    encouraging:"Keep up the great work — you have the potential to excel. I look forward to seeing your continued growth!",
+    formal:"It is recommended that the student and instructor schedule a formal review session to align on the identified intervention areas.",
+    direct:"Address the flagged areas immediately. The pathway to certification is clear; execution is what matters now.",
+  };
+  const sections = [
+    { title:"Overall Performance", text:`${openings[tone]} Your overall average currently stands at <strong>${overall}%</strong>, which is ${overall>=75?"on track towards certification":overall>=60?"progressing, though further effort is needed":"below expectations and requires focused attention"}.` },
+    { title:"Strengths", text:`Your strongest area is <strong>${best.label}</strong> with a score of <strong>${best.score}%</strong>${best.score>=best.target?", which has met its target — well done!":`, though there is still a gap of ${best.target-best.score} points to close.`}` },
+    { title:"Areas for Improvement", text:skillsBelow.length===0?"All skills are currently above the 70% threshold. No immediate intervention is required.":`The following skills require prioritised attention: ${skillsBelow.map(s=>`<strong>${s.label}</strong> (${s.score}% vs ${s.target}% target)`).join(", ")}.` },
+    { title:"Recommended Next Steps", text:`Focus this week on <strong>${worst.label}</strong>. ${worst.activity||"Complete the recommended activities in the AI Recommendations panel."}` },
+    { title:"Closing Remarks", text:closings[tone] },
+  ];
+  el.innerHTML = sections.map(s => `
+    <div class="fb-section">
+      <div class="fb-section-title">${s.title}</div>
+      <div class="fb-text">${s.text}</div>
+    </div>`).join("");
+}
+
+// ═══════════════════════════════════════════════════════
+// AI SIMULATOR
+// ═══════════════════════════════════════════════════════
+
+// ── 9. EXAM SIMULATOR ──
+let examState = {};
+let examTimerInterval = null;
+
+function getExamPool() { return Object.values(QUIZ_BANK).flat(); }
+
+function initExam() {
+  clearInterval(examTimerInterval);
+  const questions = [...getExamPool()].sort(() => Math.random()-.5).slice(0,10);
+  examState = { questions, current:0, score:0, answered:false, timeLeft:90 };
+  document.getElementById("exam-total").textContent = questions.length;
+  document.getElementById("exam-score").textContent = 0;
+  renderExamQuestion();
+  startExamTimer();
+}
+function startExamTimer() {
+  clearInterval(examTimerInterval);
+  examTimerInterval = setInterval(() => {
+    examState.timeLeft--;
+    const el = document.getElementById("exam-timer");
+    if (el) { el.textContent = "⏱ "+examState.timeLeft+"s"; el.className = "exam-timer "+(examState.timeLeft>30?"ok":""); }
+    if (examState.timeLeft <= 0) {
+      clearInterval(examTimerInterval);
+      if (!examState.answered) { examState.current++; renderExamQuestion(); if (examState.current < examState.questions.length) { examState.timeLeft=90; startExamTimer(); } }
+    }
+  }, 1000);
+}
+function renderExamQuestion() {
+  const { questions, current, score } = examState;
+  const el = document.getElementById("exam-content");
+  document.getElementById("exam-progress-fill").style.width = (current/questions.length*100)+"%";
+  document.getElementById("exam-qnum").textContent = Math.min(current+1, questions.length);
+  if (current >= questions.length) {
+    clearInterval(examTimerInterval);
+    const pct = Math.round((score/questions.length)*100);
+    const color = pct>=80?"var(--success)":pct>=60?"var(--warn)":"var(--danger)";
+    el.innerHTML = `<div class="quiz-result-screen">
+      <div class="quiz-score-big" style="color:${color};">${score}/${questions.length}</div>
+      <div class="quiz-score-label">Exam Score: ${pct}% — ${pct>=80?"Pass 🎉":"Needs more preparation"}</div>
+      <button class="btn btn-primary" style="margin-top:20px;" onclick="initExam()">Retake Exam</button>
+    </div>`;
+    document.getElementById("exam-progress-fill").style.width = "100%"; return;
+  }
+  const q = questions[current];
+  examState.answered = false; examState.timeLeft = 90;
+  el.innerHTML = `<div class="quiz-question">Q${current+1}. ${q.q}</div>
+    <div class="quiz-options">
+      ${q.opts.map((o,i) => `<div class="quiz-option" onclick="answerExam(${i})" id="eopt-${i}">
+        <span class="opt-key">${String.fromCharCode(65+i)}</span>${o}</div>`).join("")}
+    </div>`;
+}
+function answerExam(idx) {
+  if (examState.answered) return;
+  examState.answered = true;
+  clearInterval(examTimerInterval);
+  const q = examState.questions[examState.current];
+  const isCorrect = idx === q.ans;
+  if (isCorrect) { examState.score++; document.getElementById("exam-score").textContent = examState.score; }
+  document.querySelectorAll(".quiz-option").forEach((el,i) => {
+    if (i===q.ans) el.classList.add("correct"); else if (i===idx&&!isCorrect) el.classList.add("wrong");
+  });
+  setTimeout(() => { examState.current++; renderExamQuestion(); if (examState.current<examState.questions.length) { startExamTimer(); } }, 1200);
+}
+
+// ── 10. LAB FAULT SIMULATOR ──
+const LAB_COMPONENTS = [
+  { id:"fuse",      icon:"⚡", name:"Fuse" },
+  { id:"switch",    icon:"🔘", name:"Switch" },
+  { id:"resistor",  icon:"🟦", name:"Resistor" },
+  { id:"capacitor", icon:"🔋", name:"Capacitor" },
+  { id:"wire_a",    icon:"〰️", name:"Wire A" },
+  { id:"wire_b",    icon:"〰️", name:"Wire B" },
+  { id:"relay",     icon:"🔌", name:"Relay" },
+  { id:"motor",     icon:"⚙️", name:"Motor" },
+];
+let labState = {};
+function initLab() {
+  const faultIdx = Math.floor(Math.random() * LAB_COMPONENTS.length);
+  labState = { faultId:LAB_COMPONENTS[faultIdx].id, inspected:{}, found:false, attempts:0 };
+  document.getElementById("lab-log").innerHTML = '<span style="color:var(--muted);">No components inspected yet.</span>';
+  document.getElementById("lab-result").innerHTML = "";
+  renderLabComponents();
+}
+function renderLabComponents() {
+  const el = document.getElementById("lab-components");
+  if (!el) return;
+  el.innerHTML = LAB_COMPONENTS.map(c => {
+    const ins = labState.inspected[c.id];
+    const cls = !ins?"":ins==="fault"?"fault":"ok";
+    return `<div class="lab-component ${cls}" onclick="inspectComponent('${c.id}')">
+      <div class="lc-icon">${c.icon}</div>
+      <div class="lc-name">${c.name}</div>
+      <div class="lc-status">${!ins?"Click to inspect":ins==="fault"?"⚠ FAULT DETECTED":"✔ OK"}</div>
+    </div>`;
+  }).join("");
+}
+function inspectComponent(id) {
+  if (labState.found) return;
+  labState.attempts++;
+  const isFault = id === labState.faultId;
+  labState.inspected[id] = isFault ? "fault" : "ok";
+  const comp = LAB_COMPONENTS.find(c => c.id === id);
+  const logEl = document.getElementById("lab-log");
+  const prev = logEl.innerHTML.includes("No components") ? "" : logEl.innerHTML;
+  logEl.innerHTML = prev+`<div>${comp.icon} <strong>${comp.name}</strong>: ${isFault?`<span style='color:var(--danger);'>FAULT FOUND</span>`:`<span style='color:var(--success);'>OK</span>`}</div>`;
+  renderLabComponents();
+  if (isFault) {
+    labState.found = true;
+    const pts = Math.max(10, 100-(labState.attempts-1)*15);
+    document.getElementById("lab-result").innerHTML = `<div class="ai-narrative">✅ Fault identified: <strong>${comp.name}</strong> in ${labState.attempts} attempt${labState.attempts!==1?"s":""}. Score: <strong>${pts}/100</strong>. ${pts>=70?"Excellent troubleshooting!":"Keep practising systematic diagnosis."}</div>`;
+  }
+}
+
+// ── 11. WHAT-IF SIMULATOR ──
+let whatifScores = {};
+function initWhatif() {
+  const el = document.getElementById("whatif-sliders");
+  if (!el) return;
+  SKILLS.forEach(s => { whatifScores[s.id] = s.score; });
+  el.innerHTML = SKILLS.map(s => `
+    <div class="whatif-row">
+      <div class="whatif-label">${s.label}</div>
+      <input type="range" min="0" max="100" value="${s.score}" style="flex:1;accent-color:var(--accent);"
+        oninput="whatifScores['${s.id}']=+this.value;document.getElementById('wi-val-${s.id}').textContent=this.value+'%';renderWhatifResults();" />
+      <span id="wi-val-${s.id}" style="font-size:12px;font-weight:700;min-width:36px;text-align:right;">${s.score}%</span>
+    </div>`).join("");
+  renderWhatifResults();
+}
+function calcWhatifCert(weights) {
+  let score = 0;
+  for (const [id,w] of Object.entries(weights)) score += (whatifScores[id]??0)*w;
+  return Math.round(score);
+}
+function renderWhatifResults() {
+  const el = document.getElementById("whatif-results");
+  if (!el) return;
+  const certs = [
+    { name:"CompTIA ITF+", key:"comptia", color:"var(--accent)" },
+    { name:"SKM Level 3",  key:"skm",     color:"var(--purple)" },
+    { name:"IEV Wiring",   key:"iev",     color:"var(--success)" },
+  ];
+  el.innerHTML = certs.map(c => {
+    const now  = calcCertReadiness(CERT_WEIGHTS[c.key]);
+    const proj = calcWhatifCert(CERT_WEIGHTS[c.key]);
+    const delta = proj - now;
+    const dc = delta>0?"var(--success)":delta<0?"var(--danger)":"var(--muted)";
+    const ds = delta>0?`▲ +${delta}%`:delta<0?`▼ ${delta}%`:"─ No change";
+    return `<div class="whatif-cert-card">
+      <div class="whatif-cert-pct" style="color:${c.color};">${proj}%</div>
+      <div class="whatif-cert-name">${c.name}</div>
+      <div class="whatif-delta" style="color:${dc};">${ds}</div>
+    </div>`;
+  }).join("");
+}
+
+// ── 12. SKILLS CHALLENGE ──
+const CHALLENGE_QUESTIONS = [
+  { prompt:"What is 240V ÷ 12Ω = ? (Amperes)", answer:"20", hint:"Use Ohm's Law: I = V/R" },
+  { prompt:"Name the unit of electrical power.", answer:"watt", hint:"P = IV" },
+  { prompt:"How many watts in 1 kW?", answer:"1000", hint:"kilo = 1000" },
+  { prompt:"What colour is the LIVE wire in Malaysia?", answer:"red", hint:"R-Y-B phase colours" },
+  { prompt:"What does MCB stand for?", answer:"miniature circuit breaker", hint:"A protective device" },
+  { prompt:"Voltage = Current × ?", answer:"resistance", hint:"Ohm's Law" },
+  { prompt:"What is the safe voltage limit for AC (IEC)?", answer:"50", hint:"In volts" },
+  { prompt:"What device measures current?", answer:"ammeter", hint:"It connects in series" },
+];
+let challengeState = {};
+function initChallenge() {
+  const questions = [...CHALLENGE_QUESTIONS].sort(()=>Math.random()-.5);
+  challengeState = { questions, current:0, score:0, streak:0, bestStreak:0, history:[] };
+  document.getElementById("ch-score").textContent = 0;
+  document.getElementById("ch-streak").textContent = 0;
+  document.getElementById("ch-best").textContent = 0;
+  document.getElementById("ch-streak-dots").innerHTML = "";
+  renderChallengeQuestion();
+}
+function renderChallengeQuestion() {
+  const { questions, current } = challengeState;
+  const el = document.getElementById("challenge-arena");
+  if (!el) return;
+  if (current >= questions.length) {
+    el.innerHTML = `<div class="quiz-result-screen">
+      <div class="quiz-score-big" style="color:var(--accent);">${challengeState.score}</div>
+      <div class="quiz-score-label">Final Score · Best Streak: ${challengeState.bestStreak} 🔥</div>
+      <button class="btn btn-success" style="margin-top:16px;" onclick="initChallenge()">Play Again</button>
+    </div>`; return;
+  }
+  const q = questions[current];
+  el.innerHTML = `<div class="challenge-q">
+    <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:6px;">CHALLENGE ${current+1}/${questions.length}</div>
+    <div class="cq-prompt">${q.prompt}</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">💡 Hint: ${q.hint}</div>
+    <div class="challenge-answer">
+      <input type="text" id="ch-input" placeholder="Type your answer…" onkeydown="if(event.key==='Enter')submitChallenge()" />
+      <button class="btn btn-primary btn-sm" onclick="submitChallenge()">Submit</button>
+    </div>
+  </div>`;
+  setTimeout(() => { const inp=document.getElementById("ch-input"); if(inp)inp.focus(); }, 50);
+}
+function submitChallenge() {
+  const inp = document.getElementById("ch-input");
+  if (!inp) return;
+  const answer = inp.value.trim().toLowerCase();
+  const q = challengeState.questions[challengeState.current];
+  const correct = answer === q.answer.toLowerCase() || (q.answer.toLowerCase().includes(answer) && answer.length > 2);
+  if (correct) {
+    challengeState.score += 10 + challengeState.streak * 2;
+    challengeState.streak++;
+    if (challengeState.streak > challengeState.bestStreak) challengeState.bestStreak = challengeState.streak;
+  } else { challengeState.streak = 0; }
+  challengeState.history.push(correct);
+  challengeState.current++;
+  document.getElementById("ch-score").textContent = challengeState.score;
+  document.getElementById("ch-streak").textContent = challengeState.streak;
+  document.getElementById("ch-best").textContent = challengeState.bestStreak;
+  const dot = document.createElement("div");
+  dot.className = "streak-dot " + (correct?"hit":"miss");
+  document.getElementById("ch-streak-dots").appendChild(dot);
+  renderChallengeQuestion();
+}
+
+// ═══════════════════════════════════════════════════════
+// BM / EN LANGUAGE TOGGLE
+// ═══════════════════════════════════════════════════════
+let currentLang = "en";
+
+const I18N = {
+  en: {
+    // Navbar
+    "nav.bm": "BM", "nav.en": "EN",
+    "nav.reset": "↺ Reset Demo", "nav.pdf": "🖨 Export PDF",
+    "nav.qr": "📲 Share QR",
+    "nav.lecturerView": "Lecturer View", "nav.studentView": "Student View",
+    "nav.student": "👤 Student", "nav.lecturer": "🎓 Lecturer",
+    // Sidebar sections
+    "sidebar.overview": "Overview", "sidebar.performance": "Performance",
+    "sidebar.aiFeatures": "AI Features", "sidebar.aiInsights": "AI Insights",
+    "sidebar.aiTools": "AI Tools",
+    // Sidebar items
+    "sidebar.home": "Overview", "sidebar.profile": "Student Profile",
+    "sidebar.scores": "Scores & Radar", "sidebar.gap": "Skill Gap",
+    "sidebar.activity": "Weekly Activity", "sidebar.input": "Performance Input",
+    "sidebar.recs": "AI Recommendations", "sidebar.plan": "Weekly Study Plan",
+    "sidebar.certs": "Certifications",
+    "sidebar.profiler": "Skill Profiler", "sidebar.forecast": "Progress Forecast",
+    "sidebar.warning": "Early Warning", "sidebar.goals": "Goal Planner",
+    "sidebar.quiz": "Quiz Generator", "sidebar.exam": "Exam Simulator",
+    "sidebar.challenge": "Skills Challenge", "sidebar.lab": "Lab Fault Sim",
+    "sidebar.whatif": "What-If Simulator", "sidebar.lp": "Learning Path",
+    "sidebar.rc": "Report Card", "sidebar.feedback": "Feedback",
+    // Sidebar user roles
+    "role.lecturer": "Lecturer", "role.student": "Student",
+    // Tooltips
+    "tip.overview": "Overview", "tip.profile": "Student Profile",
+    "tip.scores": "Scores & Radar", "tip.gap": "Skill Gap",
+    "tip.activity": "Weekly Activity", "tip.input": "Performance Input",
+    "tip.recs": "AI Recommendations", "tip.plan": "Weekly Study Plan",
+    "tip.certs": "Certifications",
+  },
+  bm: {
+    // Navbar
+    "nav.bm": "BM", "nav.en": "EN",
+    "nav.reset": "↺ Set Semula", "nav.pdf": "🖨 Eksport PDF",
+    "nav.qr": "📲 Kongsi QR",
+    "nav.lecturerView": "Pandangan Pensyarah", "nav.studentView": "Pandangan Pelajar",
+    "nav.student": "👤 Pelajar", "nav.lecturer": "🎓 Pensyarah",
+    // Sidebar sections
+    "sidebar.overview": "Gambaran Umum", "sidebar.performance": "Prestasi",
+    "sidebar.aiFeatures": "Ciri AI", "sidebar.aiInsights": "Analisis AI",
+    "sidebar.aiTools": "Alat AI",
+    // Sidebar items
+    "sidebar.home": "Gambaran Umum", "sidebar.profile": "Profil Pelajar",
+    "sidebar.scores": "Markah & Radar", "sidebar.gap": "Jurang Kemahiran",
+    "sidebar.activity": "Aktiviti Mingguan", "sidebar.input": "Input Prestasi",
+    "sidebar.recs": "Cadangan AI", "sidebar.plan": "Pelan Belajar Mingguan",
+    "sidebar.certs": "Pensijilan",
+    "sidebar.profiler": "Profil Kemahiran", "sidebar.forecast": "Ramalan Kemajuan",
+    "sidebar.warning": "Amaran Awal", "sidebar.goals": "Perancang Matlamat",
+    "sidebar.quiz": "Penjana Kuiz", "sidebar.exam": "Simulator Peperiksaan",
+    "sidebar.challenge": "Cabaran Kemahiran", "sidebar.lab": "Sim. Kerosakan Makmal",
+    "sidebar.whatif": "Simulator Andaian", "sidebar.lp": "Laluan Pembelajaran",
+    "sidebar.rc": "Kad Laporan", "sidebar.feedback": "Maklum Balas",
+    // Sidebar user roles
+    "role.lecturer": "Pensyarah", "role.student": "Pelajar",
+    // Tooltips
+    "tip.overview": "Gambaran Umum", "tip.profile": "Profil Pelajar",
+    "tip.scores": "Markah & Radar", "tip.gap": "Jurang Kemahiran",
+    "tip.activity": "Aktiviti Mingguan", "tip.input": "Input Prestasi",
+    "tip.recs": "Cadangan AI", "tip.plan": "Pelan Belajar Mingguan",
+    "tip.certs": "Pensijilan",
+  }
+};
+
+function t(key) {
+  return (I18N[currentLang] && I18N[currentLang][key]) || (I18N.en[key]) || key;
+}
+
+function setLang(lang) {
+  currentLang = lang;
+  document.getElementById("btn-bm").classList.toggle("active", lang === "bm");
+  document.getElementById("btn-en").classList.toggle("active", lang === "en");
+
+  // Update all elements with data-i18n attribute
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    const key = el.getAttribute("data-i18n");
+    el.textContent = t(key);
+  });
+
+  // Update role badge text (respects current role)
+  const isLecturer = currentRole === "lecturer";
+  document.getElementById("role-badge").textContent = isLecturer ? t("nav.lecturerView") : t("nav.studentView");
+
+  // Update role toggle button labels
+  document.getElementById("btn-student").textContent = t("nav.student");
+  document.getElementById("btn-lecturer").textContent = t("nav.lecturer");
+
+  // Update sidebar role label
+  document.getElementById("sidebar-role-label").textContent = isLecturer ? t("role.lecturer") : t("role.student");
+
+  // Update sidebar data-tip tooltips for collapsed mode
+  const tipMap = {
+    "panel-overview": "tip.overview", "panel-profile": "tip.profile",
+    "panel-scores": "tip.scores", "panel-gap": "tip.gap",
+    "panel-activity": "tip.activity", "panel-input": "tip.input",
+    "panel-recs": "tip.recs", "panel-plan": "tip.plan",
+    "panel-certs": "tip.certs",
+  };
+  document.querySelectorAll(".nav-item[data-panel]").forEach(el => {
+    const panel = el.getAttribute("data-panel");
+    if (tipMap[panel]) el.setAttribute("data-tip", t(tipMap[panel]));
+  });
+
+  showToast(lang === "bm" ? "🇲🇾 Bahasa Malaysia dipilih" : "🌐 English selected");
+}
+
+// ─────────────────────────────────────────────
+// EXCEL IMPORT — Feature
+// ─────────────────────────────────────────────
+let importedStudents = [];   // array of parsed student objects
+let pendingStudents  = [];   // parsed but not yet confirmed
+let currentStudentIdx = 0;
+
+// Column header → SKILLS id map (matches students_template.xlsx headers)
+const EXCEL_COL_MAP = {
+  "knowledge":         "knowledge",
+  "practical skill":   "practical",
+  "affective":         "affective",
+  "problem solving":   "problem_solving",
+  "safety practices":  "safety",
+  "communication":     "communication"
+};
+
+function openImportModal() {
+  document.getElementById("import-modal").classList.add("open");
+  document.getElementById("import-preview-area").innerHTML = "";
+  document.getElementById("btn-confirm-import").style.display = "none";
+  const fi = document.getElementById("excel-file-input");
+  if (fi) fi.value = "";
+  pendingStudents = [];
+}
+
+function closeImportModal() {
+  document.getElementById("import-modal").classList.remove("open");
+}
+
+document.getElementById("import-modal").addEventListener("click", function(e) {
+  if (e.target === this) closeImportModal();
+});
+
+function handleExcelDrop(event) {
+  event.preventDefault();
+  document.getElementById("import-drop").classList.remove("drag-over");
+  const file = event.dataTransfer.files[0];
+  if (file) handleExcelFile(file);
+}
+
+function handleExcelFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb   = XLSX.read(data, { type: "array" });
+      const ws   = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+      if (!rows.length) {
+        showParseError("The sheet appears to be empty.");
+        return;
+      }
+
+      // Map rows → student objects
+      const parsed = rows.map(row => {
+        // Normalise header keys (trim + lowercase) for flexible matching
+        const norm = {};
+        for (const k of Object.keys(row)) {
+          norm[k.trim().toLowerCase()] = row[k];
+        }
+        const name      = String(norm["name"] || "").trim();
+        const cohort    = String(norm["cohort"] || "").trim();
+        const programme = String(norm["programme"] || "").trim();
+        const scores = {};
+        for (const [colKey, skillId] of Object.entries(EXCEL_COL_MAP)) {
+          const raw = norm[colKey];
+          scores[skillId] = Math.min(100, Math.max(0, parseInt(raw, 10) || 0));
+        }
+        return { name, cohort, programme, scores };
+      }).filter(s => s.name);  // skip rows with no name
+
+      if (!parsed.length) {
+        showParseError("No valid student rows found. Check the Name column.");
+        return;
+      }
+
+      pendingStudents = parsed;
+      renderImportPreview(parsed);
+      document.getElementById("btn-confirm-import").style.display = "";
+    } catch(err) {
+      showParseError("Could not read the file: " + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function showParseError(msg) {
+  document.getElementById("import-preview-area").innerHTML =
+    `<div style="color:var(--danger);font-size:12px;margin-top:10px;padding:10px;background:#fff5f5;border-radius:8px;border:1px solid #fecaca;">⚠️ ${msg}</div>`;
+  document.getElementById("btn-confirm-import").style.display = "none";
+}
+
+function renderImportPreview(students) {
+  const skillCols = ["knowledge","practical","affective","problem_solving","safety","communication"];
+  const skillLabels = { knowledge:"Know.", practical:"Pract.", affective:"Aff.", problem_solving:"Prob.", safety:"Safety", communication:"Comm." };
+  const headerCells = ["Name","Cohort","Programme",...skillCols.map(id => skillLabels[id])].map(h => `<th>${h}</th>`).join("");
+  const bodyRows = students.map(s => {
+    const scoreCells = skillCols.map(id => {
+      const v = s.scores[id];
+      const cls = v < 50 ? "pill-danger" : v < 70 ? "pill-warn" : "pill-success";
+      return `<td><span class="score-pill ${cls}" style="font-size:10px;padding:1px 7px;">${v}</span></td>`;
+    }).join("");
+    return `<tr><td style="font-weight:600;">${s.name}</td><td>${s.cohort}</td><td>${s.programme}</td>${scoreCells}</tr>`;
+  }).join("");
+  document.getElementById("import-preview-area").innerHTML =
+    `<div class="import-preview"><table><thead><tr>${headerCells}</tr></thead><tbody>${bodyRows}</tbody></table></div>
+     <div style="font-size:11px;color:var(--muted);margin-top:8px;">✅ ${students.length} student record(s) ready to import.</div>`;
+}
+
+function confirmImport() {
+  if (!pendingStudents.length) return;
+  importedStudents = pendingStudents;
+  pendingStudents  = [];
+
+  // Populate student selector dropdown
+  const sel = document.getElementById("student-select");
+  sel.innerHTML = importedStudents.map((s, i) => `<option value="${i}">${s.name}</option>`).join("");
+
+  // Show the student bar
+  document.getElementById("student-bar").classList.add("visible");
+  document.getElementById("import-count").textContent = importedStudents.length;
+
+  closeImportModal();
+
+  // Load first student
+  switchStudent(0);
+  showToast(`✅ ${importedStudents.length} student(s) imported from Excel`);
+}
+
+function switchStudent(idx) {
+  idx = parseInt(idx, 10);
+  currentStudentIdx = idx;
+  const s = importedStudents[idx];
+  if (!s) return;
+
+  // Update SKILLS scores from imported data
+  SKILLS.forEach(skill => {
+    if (s.scores[skill.id] !== undefined) {
+      skill.score = s.scores[skill.id];
+    }
+  });
+
+  // Sync slider UI
+  SKILLS.forEach(skill => {
+    ["inp-", "inp2-"].forEach(prefix => {
+      const el = document.getElementById(prefix + skill.id);
+      if (el) el.value = skill.score;
+    });
+    ["val-", "val2-"].forEach(prefix => {
+      const el = document.getElementById(prefix + skill.id);
+      if (el) el.textContent = skill.score + "%";
+    });
+  });
+
+  // Update student meta in the bar
+  document.getElementById("bar-cohort").textContent    = s.cohort    || "—";
+  document.getElementById("bar-programme").textContent = s.programme || "—";
+
+  // Update name / avatar in all display locations
+  const initials = s.name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  const updateText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  updateText("ov-name",       s.name);
+  updateText("prof-name",     s.name);
+  updateText("prof-cohort",   s.cohort);
+  updateText("prof-avatar",   initials);
+  updateText("ov-avatar",     initials);
+  updateText("ov-role",       (s.programme ? "TVET Level 3 — " + s.programme : ""));
+  updateText("prof-role",     (s.programme ? "TVET Level 3 — " + s.programme : ""));
+  const ovSub = document.getElementById("ov-student-sub");
+  if (ovSub) ovSub.textContent = `${s.name} · Cohort ${s.cohort} · TVET Level 3 ${s.programme}`;
+
+  // Re-render all panels with new data
+  applyScores();
+}
+
+// ─────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────
+loadFromStorage();
+buildInputs();
+buildInputs2();
+applyScores();
+buildFAQChips();
+renderBadges(loadBadges());
+// Pre-fill saved API key if present
+const savedKey = getGeminiKey();
+if (savedKey) { const el = document.getElementById("gemini-key"); if (el) el.value = savedKey; }
+// Update sidebar role label
+document.getElementById("sidebar-role-label").textContent = currentRole === "lecturer" ? "Lecturer" : "Student";
+</script>
+</body>
+</html>
